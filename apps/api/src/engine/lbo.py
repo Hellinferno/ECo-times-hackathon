@@ -295,13 +295,15 @@ class LBOEngine:
             # Mandatory TLA amortisation
             tla_amort = min(tla_original * self.tla_amort_pct, tla_remaining)
 
+            # Capture opening balances before any paydowns in this period
+            total_debt_open = tla_remaining + tlb + mezz
+
             # Cash available for voluntary debt paydown (cash sweep)
             cash_after_interest_and_amort = ufcf - total_cash_interest - tla_amort
             tlb_sweep = max(min(cash_after_interest_and_amort, tlb), 0.0)
             tlb -= tlb_sweep
             tla_remaining -= tla_amort
 
-            total_debt_open = tla_remaining + tla_amort + tlb + tlb_sweep + mezz
             total_debt_close = tla_remaining + tlb + mezz
 
             schedule.append({
@@ -363,7 +365,9 @@ class LBOEngine:
         """
         Return a 2-D sensitivity matrix: IRR(%) for each (entry, exit) pair.
 
-        Used by WorkbookBuilder.write_lbo_model() to populate the sensitivity tab.
+        Creates a fresh LBOEngine per cell so that debt structure parameters
+        (senior_debt_ebitda, equity_contribution_pct, etc.) are applied
+        correctly for each entry multiple.
         """
         matrix: dict = {}
         for em in entry_multiples:

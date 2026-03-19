@@ -1,11 +1,32 @@
+import logging
+import os
 import uuid
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
-from dependencies import CurrentUserDep, DevBootstrapTokenDep, issue_dev_access_token
+from dependencies import CurrentUserDep, DbSessionDep, DevBootstrapTokenDep, issue_dev_access_token
 from models import APIResponse, AuthTokenResponse, CurrentUserResponse, DevAuthTokenRequest, Meta
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["Auth"])
+
+_redis_client = None
+
+
+def _get_redis():
+    """Return a synchronous Redis client, or None if unavailable."""
+    global _redis_client
+    if _redis_client is not None:
+        return _redis_client
+    try:
+        import redis
+
+        url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+        _redis_client = redis.from_url(url, decode_responses=True)
+        _redis_client.ping()
+        return _redis_client
+    except Exception:
+        return None
 
 
 @router.post("/dev-token", response_model=APIResponse)
@@ -50,3 +71,32 @@ async def get_me(current_user: CurrentUserDep):
         ),
         meta=Meta(request_id=f"req_{uuid.uuid4().hex[:8]}"),
     )
+
+
+@router.post("/logout", response_model=APIResponse)
+async def logout(current_user: CurrentUserDep, db: DbSessionDep):
+    """Invalidate the current token by adding it to a Redis blocklist."""
+    token_id = current_user.get("token_id")
+    if not token_id:
+        raise HTTPException(status_code=400, detail="No token_id in session")
+
+    # Add token_id to Redis blocklist with 8h TTL (matches JWT expiry)
+    r = _get_redis()
+    if r is not None:
+        try:
+            r.setex(f"blocklist:{token_id}", 28800, "1")
+            logger.info("token blocklisted: token_id=%s user_id=%s", token_id, current_user["user_id"])
+        except Exception as exc:
+            logger.warning("Redis blocklist write failed: %s", exc)
+
+    from audit import log_security_event
+
+    log_security_event(
+        db=db,
+        action="auth.logout",
+        tenant_id=current_user["tenant_id"],
+        user_id=current_user["user_id"],
+    )
+
+    return APIResponse(success=True, data={"message": "Logged out successfully"}, meta=Meta(request_id=f"req_{uuid.uuid4().hex[:8]}"))
+

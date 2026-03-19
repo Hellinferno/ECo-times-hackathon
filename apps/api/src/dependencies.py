@@ -193,6 +193,28 @@ def create_access_token(
     return token, expires_at
 
 
+_blocklist_redis = None
+
+
+def _is_token_blocklisted(token_id: str | None) -> bool:
+    """Check if a token_id has been revoked via the Redis blocklist."""
+    global _blocklist_redis
+    if not token_id:
+        return False
+    try:
+        if _blocklist_redis is None:
+            import redis as _redis
+
+            url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+            _blocklist_redis = _redis.from_url(url, decode_responses=True)
+            _blocklist_redis.ping()
+        return _blocklist_redis.exists(f"blocklist:{token_id}") > 0
+    except Exception:
+        # Redis unavailable or errored — fail open (allow the token)
+        _blocklist_redis = None
+        return False
+
+
 def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> UserContext:
@@ -213,7 +235,17 @@ def get_current_user(
         )
 
     claims = decode_access_token(token, settings)
-    return _claims_to_user_context(claims)
+    user = _claims_to_user_context(claims)
+
+    # Check if token was revoked via logout
+    if _is_token_blocklisted(user.get("token_id")):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return user
 
 
 def require_roles(*allowed_roles: str):
@@ -282,4 +314,6 @@ def issue_dev_access_token(
 DbSessionDep = Annotated[Session, Depends(get_db)]
 CurrentUserDep = Annotated[UserContext, Depends(get_current_user)]
 ReviewerUserDep = Annotated[UserContext, Depends(require_reviewer_role)]
+AdminReviewerDep = Annotated[UserContext, Depends(require_roles("admin", "reviewer"))]
+AdminDep = Annotated[UserContext, Depends(require_roles("admin"))]
 DevBootstrapTokenDep = Annotated[str | None, Header(alias="X-Dev-API-Token")]
