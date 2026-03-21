@@ -172,34 +172,50 @@ export default function AgentsTab({ dealId }: Props) {
     useEffect(() => {
         if (!activeRunId) return
         const startTime = Date.now()
-        const interval = window.setInterval(async () => {
+        let cancelled = false
+        let timeoutId: number | null = null
+
+        const stopPolling = () => {
+            setDeploying(false)
+            setActiveRunId(null)
+        }
+
+        const getNextDelay = (elapsed: number) => (
+            elapsed < 30_000 ? 2500 : elapsed < 120_000 ? 5000 : 10_000
+        )
+
+        const pollRun = async () => {
             const elapsed = Date.now() - startTime
             try {
                 const run = await fetchAgentRun(dealId, activeRunId)
+                if (cancelled) return
                 setResult(run)
                 if (run.valuation_result) setValuation(run.valuation_result)
-                if ((run as Record<string, unknown>).lbo_result) {
-                    setLboResult((run as Record<string, unknown>).lbo_result as Record<string, unknown>)
-                }
+                setLboResult(run.lbo_result ?? null)
                 if (run.status === 'completed') {
-                    setDeploying(false)
-                    setActiveRunId(null)
+                    stopPolling()
                 } else if (run.status === 'failed') {
-                    setDeploying(false)
-                    setActiveRunId(null)
+                    stopPolling()
                     setError(run.error_message || 'Agent run failed')
                 } else if (elapsed > 10 * 60 * 1000) {
-                    setDeploying(false)
-                    setActiveRunId(null)
+                    stopPolling()
                     setError('Agent run timed out after 10 minutes. Check server logs.')
+                } else {
+                    timeoutId = window.setTimeout(pollRun, getNextDelay(elapsed))
                 }
             } catch {
-                setDeploying(false)
-                setActiveRunId(null)
+                if (cancelled) return
+                stopPolling()
                 setError('Failed to refresh agent status')
             }
-        }, elapsed < 30000 ? 2500 : elapsed < 120000 ? 5000 : 10000)
-        return () => window.clearInterval(interval)
+        }
+
+        timeoutId = window.setTimeout(pollRun, getNextDelay(0))
+
+        return () => {
+            cancelled = true
+            if (timeoutId !== null) window.clearTimeout(timeoutId)
+        }
     }, [activeRunId, dealId])
 
     const handleDeploy = async () => {
@@ -232,9 +248,7 @@ export default function AgentsTab({ dealId }: Props) {
             })
             setResult(res)
             if (res.valuation_result) setValuation(res.valuation_result)
-            if ((res as Record<string, unknown>).lbo_result) {
-                setLboResult((res as Record<string, unknown>).lbo_result as Record<string, unknown>)
-            }
+            setLboResult(res.lbo_result ?? null)
 
             if (res.status === 'completed') {
                 setDeploying(false)

@@ -10,11 +10,11 @@ import TasksTab from '../components/workspace/TasksTab'
 type TabKey = 'overview' | 'documents' | 'agents' | 'outputs' | 'tasks'
 
 const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
-    { key: 'overview', label: 'Overview', icon: <LayoutDashboard size={13} /> },
-    { key: 'documents', label: 'Data Room', icon: <FileText size={13} /> },
-    { key: 'agents', label: 'Agents', icon: <Bot size={13} /> },
-    { key: 'outputs', label: 'Outputs', icon: <Download size={13} /> },
-    { key: 'tasks', label: 'Tasks', icon: <CheckSquare size={13} /> },
+    { key: 'overview', label: 'Overview', icon: <LayoutDashboard size={14} /> },
+    { key: 'documents', label: 'Data Room', icon: <FileText size={14} /> },
+    { key: 'agents', label: 'Agents', icon: <Bot size={14} /> },
+    { key: 'outputs', label: 'Outputs', icon: <Download size={14} /> },
+    { key: 'tasks', label: 'Tasks', icon: <CheckSquare size={14} /> },
 ]
 
 export default function DealWorkspace() {
@@ -45,93 +45,113 @@ export default function DealWorkspace() {
 
     if (loading) {
         return (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-                <div className="spinner" style={{ width: 24, height: 24 }} />
+            <div className="flex flex-col items-center justify-center min-h-screen bg-black text-neutral-500">
+                <div className="spinner mb-4 border-t-white mix-blend-difference" />
+                <span className="font-mono text-xs uppercase tracking-widest text-neutral-400">Loading Workspace...</span>
             </div>
         )
     }
 
     if (!deal) {
         return (
-            <div style={{ textAlign: 'center', padding: 80 }}>
-                <p style={{ color: '#666' }}>Deal not found</p>
-                <button className="btn-ghost" onClick={() => navigate('/')}>Go Home</button>
+            <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white">
+                <p className="font-mono text-xs uppercase tracking-widest text-neutral-500 mb-4">Deal not found</p>
+                <button 
+                    className="border border-neutral-700 px-6 py-2 hover:bg-white hover:text-black transition-colors font-mono uppercase text-xs tracking-widest"
+                    onClick={() => navigate('/')}
+                >
+                    Return to Pipeline
+                </button>
             </div>
         )
     }
 
     return (
-        <div style={{ minHeight: '100vh' }}>
+        <div className="min-h-screen bg-black text-white font-sans selection:bg-white selection:text-black">
             {/* Top Bar */}
-            <div style={{
-                padding: '12px 28px',
-                borderBottom: '1px solid #222',
-                display: 'flex', alignItems: 'center', gap: 14,
-                background: '#000'
-            }}>
-                <button className="btn-ghost" style={{ padding: 4, border: 'none' }} onClick={() => navigate('/')}>
-                    <ArrowLeft size={16} />
-                </button>
-                <div style={{ flex: 1 }}>
-                    <h1 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: '#fff' }}>{deal.name}</h1>
-                    <p style={{ color: '#555', fontSize: 11, margin: 0 }}>{deal.company_name} · {deal.deal_type}</p>
+            <div className="px-6 md:px-10 py-5 border-b border-neutral-800 flex items-start md:items-center justify-between flex-col md:flex-row gap-4 bg-black sticky top-0 z-10">
+                <div className="flex items-center gap-4">
+                    <button 
+                        className="text-neutral-500 hover:text-white transition-colors border border-transparent hover:border-neutral-800 p-2 -ml-2" 
+                        onClick={() => navigate('/')}
+                        title="Back to Pipeline"
+                    >
+                        <ArrowLeft size={16} />
+                    </button>
+                    <div>
+                        <h1 className="text-xl font-medium tracking-tight m-0 text-white flex items-center gap-3">
+                            {deal.name}
+                        </h1>
+                        <p className="text-neutral-500 text-xs font-mono uppercase tracking-widest mt-1">
+                            {deal.company_name} <span className="mx-1 opacity-50">·</span> {deal.deal_type}
+                        </p>
+                    </div>
                 </div>
-                <div style={{ display: 'flex', gap: 6 }}>
+                
+                <div className="flex flex-wrap gap-2 md:gap-3">
                     {currentUser && <span className="badge badge-amber">{currentUser.role}</span>}
                     <span className="badge badge-indigo">{deal.deal_type}</span>
                     <span className="badge badge-emerald">{deal.deal_stage}</span>
                 </div>
             </div>
 
-            {/* Tab Nav */}
-            <div style={{
-                display: 'flex', gap: 0, padding: '0 28px',
-                borderBottom: '1px solid #222',
-                background: '#000'
-            }}>
-                {TABS.map(tab => (
-                    <button
-                        key={tab.key}
-                        className={`tab-btn ${activeTab === tab.key ? 'active' : ''}`}
-                        onClick={() => setActiveTab(tab.key)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-                    >
-                        {tab.icon} {tab.label}
-                    </button>
-                ))}
+            {/* Tab Nav Grid Box */}
+            <div className="border-b border-neutral-800 bg-black overflow-x-auto">
+                <div className="flex px-6 md:px-10 min-w-max">
+                    {TABS.map(tab => (
+                        <button
+                            key={tab.key}
+                            className={`flex items-center gap-2 px-6 py-4 text-[10px] font-mono uppercase tracking-widest transition-colors border-b-2
+                                ${activeTab === tab.key 
+                                    ? 'text-white border-white' 
+                                    : 'text-neutral-500 border-transparent hover:text-neutral-300 hover:border-neutral-800'
+                                }`}
+                            onClick={() => setActiveTab(tab.key)}
+                        >
+                            {tab.icon} {tab.label}
+                        </button>
+                    ))}
+                </div>
             </div>
 
-            {/* Tab Content */}
-            <div style={{ padding: '24px 28px' }}>
+            {/* Tab Content Box */}
+            <div className="p-6 md:p-10 max-w-[1400px] mx-auto min-h-[calc(100vh-140px)] flex flex-col">
                 {activeTab === 'overview' && (
-                    <div className="animate-fade-in">
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1, marginBottom: 20, border: '1px solid #222', borderRadius: 3, overflow: 'hidden' }}>
+                    <div className="animate-fade-in flex-1">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-neutral-800 border border-neutral-800 mb-8">
                             {[
                                 { label: 'INDUSTRY', value: deal.industry },
                                 { label: 'STAGE', value: deal.deal_stage },
-                                { label: 'CREATED', value: new Date(deal.created_at).toLocaleDateString() },
+                                { label: 'CREATED', value: new Date(deal.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) },
                             ].map((item, i) => (
-                                <div key={i} style={{
-                                    padding: '16px 18px', background: '#0a0a0a',
-                                    borderRight: i < 2 ? '1px solid #222' : 'none'
-                                }}>
-                                    <div style={{ fontSize: 9, color: '#555', letterSpacing: '0.1em', fontWeight: 700, marginBottom: 6 }}>{item.label}</div>
-                                    <div style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>{item.value}</div>
+                                <div key={i} className="bg-black p-6 md:p-8 flex flex-col justify-between group hover:bg-neutral-950 transition-colors">
+                                    <div className="text-neutral-500 text-[10px] uppercase font-mono tracking-widest mb-4">
+                                        {item.label}
+                                    </div>
+                                    <div className="text-xl md:text-2xl font-light tracking-tight text-white">
+                                        {item.value}
+                                    </div>
                                 </div>
                             ))}
                         </div>
+                        
                         {deal.notes && (
-                            <div style={{ padding: '14px 18px', background: '#0a0a0a', border: '1px solid #222', borderRadius: 3 }}>
-                                <div style={{ fontSize: 9, color: '#555', letterSpacing: '0.1em', fontWeight: 700, marginBottom: 6 }}>NOTES</div>
-                                <p style={{ color: '#aaa', fontSize: 13, margin: 0, lineHeight: 1.6 }}>{deal.notes}</p>
+                            <div className="bg-black border border-neutral-800 p-6 md:p-8">
+                                <div className="text-neutral-500 text-[10px] uppercase font-mono tracking-widest mb-4">
+                                    INTERNAL NOTES
+                                </div>
+                                <p className="text-neutral-300 text-sm leading-relaxed whitespace-pre-wrap font-sans max-w-4xl">
+                                    {deal.notes}
+                                </p>
                             </div>
                         )}
                     </div>
                 )}
-                {activeTab === 'documents' && <DocumentsTab dealId={dealId!} />}
-                {activeTab === 'agents' && <AgentsTab dealId={dealId!} />}
-                {activeTab === 'outputs' && <OutputsTab dealId={dealId!} />}
-                {activeTab === 'tasks' && <TasksTab dealId={dealId!} />}
+                
+                {activeTab === 'documents' && <div className="animate-fade-in flex-1"><DocumentsTab dealId={dealId!} /></div>}
+                {activeTab === 'agents' && <div className="animate-fade-in flex-1"><AgentsTab dealId={dealId!} /></div>}
+                {activeTab === 'outputs' && <div className="animate-fade-in flex-1"><OutputsTab dealId={dealId!} /></div>}
+                {activeTab === 'tasks' && <div className="animate-fade-in flex-1"><TasksTab dealId={dealId!} /></div>}
             </div>
         </div>
     )

@@ -28,34 +28,30 @@ export default function LoginPage({ onLogin }: Props) {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ width: 360, padding: 32, border: '1px solid #222', borderRadius: 4, background: '#0a0a0a' }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 4px', letterSpacing: '0.08em', color: '#ff6600' }}>
+    <div className="min-h-screen bg-black flex items-center justify-center font-sans selection:bg-white selection:text-black p-6">
+      <div className="w-full max-w-[400px] bg-black border border-neutral-800 p-8 md:p-12">
+        <h1 className="text-2xl font-medium tracking-tight text-white mb-2">
           AIBAA
         </h1>
-        <p style={{ color: '#666', fontSize: 12, margin: '0 0 28px' }}>
+        <p className="text-neutral-500 text-xs font-mono uppercase tracking-widest mb-10">
           AI Investment Banking Analyst Agent
         </p>
 
         {error && (
-          <div style={{
-            color: '#ff4444', fontSize: 12, padding: '8px 12px', marginBottom: 16,
-            background: 'rgba(255,68,68,0.08)', border: '1px solid rgba(255,68,68,0.25)', borderRadius: 3,
-          }}>
-            {error}
+          <div className="text-white border border-neutral-700 bg-neutral-900 px-4 py-3 text-xs font-mono mb-6">
+            Error: {error}
           </div>
         )}
 
         <button
-          className="btn-primary"
+          className="w-full bg-white text-black py-3 text-xs font-mono uppercase tracking-widest hover:bg-neutral-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-h-[44px]"
           onClick={handleDevLogin}
           disabled={loading}
-          style={{ width: '100%', justifyContent: 'center' }}
         >
-          {loading ? 'Signing in...' : 'Sign in (Dev Mode)'}
+          {loading ? <div className="spinner border-black border-t-transparent w-4 h-4" /> : 'Sign in (Dev Mode)'}
         </button>
 
-        <p style={{ color: '#444', fontSize: 10, marginTop: 16, textAlign: 'center' }}>
+        <p className="text-neutral-600 text-[10px] uppercase font-mono tracking-widest mt-6 text-center">
           Development authentication — not for production use
         </p>
       </div>

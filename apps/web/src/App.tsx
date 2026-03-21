@@ -9,7 +9,7 @@ import { useEffect } from 'react';
 import { api } from './lib/api';
 
 function BootstrappedApp() {
-  const { user, isLoading, login, isAuthenticated } = useAuth();
+  const { isLoading, login, isAuthenticated } = useAuth();
 
   useEffect(() => {
     if (isLoading) return;

@@ -6,49 +6,52 @@ export default function SettingsPage() {
   const { user, logout } = useAuth();
 
   return (
-    <div style={{ minHeight: '100vh', padding: '24px 32px', maxWidth: 640 }}>
-      <Link
-        to="/"
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#888', fontSize: 12, textDecoration: 'none', marginBottom: 24 }}
-      >
-        <ArrowLeft size={14} /> Back to Dashboard
-      </Link>
+    <div className="min-h-screen bg-black text-white p-6 md:p-12 font-sans selection:bg-white selection:text-black">
+      <div className="max-w-[800px] mx-auto">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 text-neutral-500 text-xs font-mono uppercase tracking-widest hover:text-white transition-colors mb-10 border border-transparent hover:border-neutral-800 px-3 py-2 -ml-3"
+        >
+          <ArrowLeft size={14} /> Back to Pipeline
+        </Link>
 
-      <h1 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 24px', letterSpacing: '0.04em' }}>
-        Settings
-      </h1>
+        <h1 className="text-3xl font-medium tracking-tight text-white mb-10 border-b border-neutral-800 pb-6">
+          Settings
+        </h1>
 
-      <section style={{ border: '1px solid #222', borderRadius: 4, padding: 20, marginBottom: 20 }}>
-        <h2 style={{ fontSize: 12, fontWeight: 700, color: '#888', letterSpacing: '0.08em', margin: '0 0 12px', textTransform: 'uppercase' }}>
-          Account
-        </h2>
-        <div style={{ display: 'grid', gap: 8, fontSize: 13 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ color: '#666' }}>User ID</span>
-            <span style={{ color: '#ccc', fontFamily: "'SF Mono', Consolas, monospace", fontSize: 12 }}>{user?.user_id ?? '—'}</span>
+        <section className="border border-neutral-800 bg-black mb-8">
+          <div className="border-b border-neutral-800 px-6 py-4">
+            <h2 className="text-xs font-mono uppercase tracking-widest text-neutral-500">
+              Account Overview
+            </h2>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ color: '#666' }}>Tenant</span>
-            <span style={{ color: '#ccc', fontFamily: "'SF Mono', Consolas, monospace", fontSize: 12 }}>{user?.tenant_id ?? '—'}</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-neutral-800">
+            <div className="bg-black p-6">
+              <div className="text-neutral-500 text-[10px] uppercase font-mono tracking-widest mb-2">User ID</div>
+              <div className="text-white font-mono text-sm">{user?.user_id ?? '—'}</div>
+            </div>
+            <div className="bg-black p-6">
+              <div className="text-neutral-500 text-[10px] uppercase font-mono tracking-widest mb-2">Tenant</div>
+              <div className="text-white font-mono text-sm">{user?.tenant_id ?? '—'}</div>
+            </div>
+            <div className="bg-black p-6">
+              <div className="text-neutral-500 text-[10px] uppercase font-mono tracking-widest mb-2">Role</div>
+              <div className="text-white font-mono text-sm">{user?.role ?? '—'}</div>
+            </div>
+            <div className="bg-black p-6">
+              <div className="text-neutral-500 text-[10px] uppercase font-mono tracking-widest mb-2">Email</div>
+              <div className="text-white font-mono text-sm">{user?.email ?? '—'}</div>
+            </div>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ color: '#666' }}>Role</span>
-            <span style={{ color: '#ccc', fontFamily: "'SF Mono', Consolas, monospace", fontSize: 12 }}>{user?.role ?? '—'}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ color: '#666' }}>Email</span>
-            <span style={{ color: '#ccc', fontFamily: "'SF Mono', Consolas, monospace", fontSize: 12 }}>{user?.email ?? '—'}</span>
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <button
-        className="btn-ghost"
-        onClick={logout}
-        style={{ color: '#ff4444', borderColor: 'rgba(255,68,68,0.3)' }}
-      >
-        Sign Out
-      </button>
+        <button
+          className="border border-neutral-800 text-neutral-400 hover:text-white hover:bg-neutral-900 px-6 py-3 text-xs font-mono uppercase tracking-widest transition-colors"
+          onClick={logout}
+        >
+          Sign Out
+        </button>
+      </div>
     </div>
   );
 }
