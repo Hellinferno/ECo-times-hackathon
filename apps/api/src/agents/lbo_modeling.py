@@ -25,12 +25,13 @@ logger = logging.getLogger(__name__)
 
 
 class LBOModelingAgent(BaseAgent):
-    def __init__(self, deal_id: str, input_payload: dict):
+    def __init__(self, deal_id: str, input_payload: dict, run_id: str | None = None):
         super().__init__(
             agent_type="modeling",
             task_name="lbo_model",
             deal_id=deal_id,
             input_payload=input_payload,
+            run_id=run_id,
         )
         self.system_prompt = PromptBuilder.get_system_prompt("modeling")
         self.params = input_payload.get("parameters", {})

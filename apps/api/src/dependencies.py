@@ -7,7 +7,7 @@ from typing import Annotated, Any, Dict, TypedDict
 from uuid import uuid4
 
 import jwt
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, HTTPException, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic_settings import BaseSettings
 from sqlalchemy.orm import Session
@@ -24,21 +24,28 @@ class UserContext(TypedDict):
     claims: Dict[str, Any]
 
 
+class DemoUser(TypedDict):
+    username: str
+    user_id: str
+    tenant_id: str
+    role: str
+    email: str
+
+
 class AuthSettings(BaseSettings):
-    api_bootstrap_token: str = "dev-local-token"
-    default_tenant_id: str = "org_cyberbank"
-    default_user_id: str = "usr_proto123"
-    default_user_role: str = "analyst"
-    default_user_email: str = "demo.user@aibaa.local"
     reviewer_roles: str = "reviewer,admin"
-    dev_auth_enabled: bool = True
-    dev_allowed_roles: str = "analyst,reviewer,admin"
-    jwt_secret: str = "aibaa-dev-jwt-secret-change-me"
+    jwt_secret: str = "aibaa-demo-jwt-secret-change-me"
     jwt_algorithm: str = "HS256"
     jwt_issuer: str = "aibaa.local"
     jwt_audience: str = "aibaa-api"
     jwt_expire_minutes: int = 480
     jwt_jwks_url: str | None = None
+    session_cookie_name: str = "aibaa_session"
+    session_cookie_secure: bool = False
+    session_cookie_samesite: str = "lax"
+    demo_password: str = "AIBAA-demo-2026!"
+    demo_tenant_id: str = "org_demo"
+    demo_password_hint: str = "AIBAA-demo-2026!"
 
     model_config = {"env_prefix": "AIBAA_"}
 
@@ -63,45 +70,59 @@ def _parse_csv_env(raw: str) -> set[str]:
     return {item.strip().lower() for item in (raw or "").split(",") if item.strip()}
 
 
-def _extract_role(claims: Dict[str, Any]) -> str | None:
-    direct_role = claims.get("role")
-    if isinstance(direct_role, str) and direct_role.strip():
-        return direct_role.strip()
+def get_demo_users(settings: AuthSettings | None = None) -> dict[str, DemoUser]:
+    auth_settings = settings or get_auth_settings()
+    tenant_id = auth_settings.demo_tenant_id
+    return {
+        "analyst": {
+            "username": "analyst",
+            "user_id": "usr_demo_analyst",
+            "tenant_id": tenant_id,
+            "role": "analyst",
+            "email": "analyst@demo.aibaa.local",
+        },
+        "reviewer": {
+            "username": "reviewer",
+            "user_id": "usr_demo_reviewer",
+            "tenant_id": tenant_id,
+            "role": "reviewer",
+            "email": "reviewer@demo.aibaa.local",
+        },
+        "admin": {
+            "username": "admin",
+            "user_id": "usr_demo_admin",
+            "tenant_id": tenant_id,
+            "role": "admin",
+            "email": "admin@demo.aibaa.local",
+        },
+    }
 
-    roles = claims.get("roles")
-    if isinstance(roles, list):
-        for value in roles:
-            if isinstance(value, str) and value.strip():
-                return value.strip()
 
-    realm_access = claims.get("realm_access")
-    if isinstance(realm_access, dict):
-        realm_roles = realm_access.get("roles")
-        if isinstance(realm_roles, list):
-            for value in realm_roles:
-                if isinstance(value, str) and value.strip():
-                    return value.strip()
-    return None
+def authenticate_demo_user(username: str, password: str) -> DemoUser:
+    settings = get_auth_settings()
+    if password != settings.demo_password:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid demo credentials")
+
+    normalized = username.strip().lower()
+    demo_users = get_demo_users(settings)
+    for user in demo_users.values():
+        if normalized in {user["username"], user["email"], user["role"]}:
+            return user
+
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid demo credentials")
 
 
 def _claims_to_user_context(claims: Dict[str, Any]) -> UserContext:
     user_id = str(claims.get("sub") or claims.get("user_id") or "").strip()
-    tenant_id = str(
-        claims.get("tenant_id")
-        or claims.get("tid")
-        or claims.get("org_id")
-        or claims.get("tenant")
-        or ""
-    ).strip()
-    role = str(_extract_role(claims) or "").strip()
+    tenant_id = str(claims.get("tenant_id") or claims.get("tid") or "").strip()
+    role = str(claims.get("role") or "").strip()
     email = claims.get("email")
     token_id = claims.get("jti")
 
     if not user_id or not tenant_id or not role:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="JWT is missing required claims (sub, tenant_id, role)",
-            headers={"WWW-Authenticate": "Bearer"},
+            detail="Session is missing required claims",
         )
 
     return {
@@ -160,7 +181,6 @@ def decode_access_token(token: str, settings: AuthSettings | None = None) -> Dic
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Invalid authentication credentials: {exc}",
-            headers={"WWW-Authenticate": "Bearer"},
         ) from exc
 
 
@@ -196,53 +216,97 @@ def create_access_token(
 _blocklist_redis = None
 
 
-def _is_token_blocklisted(token_id: str | None) -> bool:
-    """Check if a token_id has been revoked via the Redis blocklist."""
+def _get_blocklist_client():
     global _blocklist_redis
+    if _blocklist_redis is not None:
+        return _blocklist_redis
+    try:
+        import redis as redis_sync
+
+        url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+        _blocklist_redis = redis_sync.from_url(url, decode_responses=True)
+        _blocklist_redis.ping()
+        return _blocklist_redis
+    except Exception:
+        _blocklist_redis = None
+        return None
+
+
+def _is_token_blocklisted(token_id: str | None) -> bool:
     if not token_id:
         return False
-    try:
-        if _blocklist_redis is None:
-            import redis as _redis
-
-            url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
-            _blocklist_redis = _redis.from_url(url, decode_responses=True)
-            _blocklist_redis.ping()
-        return _blocklist_redis.exists(f"blocklist:{token_id}") > 0
-    except Exception:
-        # Redis unavailable or errored — fail open (allow the token)
-        _blocklist_redis = None
+    client = _get_blocklist_client()
+    if client is None:
         return False
+    try:
+        return client.exists(f"blocklist:{token_id}") > 0
+    except Exception:
+        return False
+
+
+def revoke_token(token_id: str | None, ttl_seconds: int) -> None:
+    if not token_id:
+        return
+    client = _get_blocklist_client()
+    if client is None:
+        return
+    try:
+        client.setex(f"blocklist:{token_id}", max(ttl_seconds, 60), "1")
+    except Exception:
+        return
+
+
+def set_session_cookie(response: Response, token: str, expires_at: datetime) -> None:
+    settings = get_auth_settings()
+    max_age = max(60, int((expires_at - datetime.now(timezone.utc)).total_seconds()))
+    response.set_cookie(
+        key=settings.session_cookie_name,
+        value=token,
+        max_age=max_age,
+        httponly=True,
+        secure=settings.session_cookie_secure,
+        samesite=settings.session_cookie_samesite,
+        path="/",
+    )
+
+
+def clear_session_cookie(response: Response) -> None:
+    settings = get_auth_settings()
+    response.delete_cookie(key=settings.session_cookie_name, path="/")
+
+
+def _get_request_token(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None,
+) -> str | None:
+    settings = get_auth_settings()
+    cookie_token = request.cookies.get(settings.session_cookie_name)
+    if cookie_token:
+        return cookie_token.strip()
+    if credentials and credentials.credentials:
+        return credentials.credentials.strip()
+    return None
 
 
 def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> UserContext:
-    if credentials is None or not credentials.credentials:
+    token = _get_request_token(request, credentials)
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing authentication credentials",
-            headers={"WWW-Authenticate": "Bearer"},
         )
 
-    token = credentials.credentials.strip()
     settings = get_auth_settings()
-    if token == settings.api_bootstrap_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Bootstrap token cannot access API routes directly. Exchange it for a JWT first.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
     claims = decode_access_token(token, settings)
     user = _claims_to_user_context(claims)
 
-    # Check if token was revoked via logout
     if _is_token_blocklisted(user.get("token_id")):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has been revoked",
-            headers={"WWW-Authenticate": "Bearer"},
+            detail="Session has been revoked",
         )
 
     return user
@@ -252,8 +316,7 @@ def require_roles(*allowed_roles: str):
     normalized_roles = {role.strip().lower() for role in allowed_roles if role.strip()}
 
     def dependency(current_user: UserContext = Depends(get_current_user)) -> UserContext:
-        current_role = current_user["role"].strip().lower()
-        if current_role not in normalized_roles:
+        if current_user["role"].strip().lower() not in normalized_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Role '{current_user['role']}' is not allowed to perform this action",
@@ -265,8 +328,7 @@ def require_roles(*allowed_roles: str):
 
 def require_reviewer_role(current_user: UserContext = Depends(get_current_user)) -> UserContext:
     reviewer_roles = _parse_csv_env(get_auth_settings().reviewer_roles)
-    current_role = current_user["role"].strip().lower()
-    if current_role not in reviewer_roles:
+    if current_user["role"].strip().lower() not in reviewer_roles:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Role '{current_user['role']}' is not allowed to approve outputs",
@@ -274,46 +336,8 @@ def require_reviewer_role(current_user: UserContext = Depends(get_current_user))
     return current_user
 
 
-def issue_dev_access_token(
-    *,
-    requested_role: str,
-    tenant_id: str | None,
-    user_id: str | None,
-    email: str | None,
-    x_dev_api_token: str | None,
-) -> tuple[str, datetime, UserContext]:
-    settings = get_auth_settings()
-    env_name = os.environ.get("AIBAA_ENV", "development").strip().lower()
-    if not settings.dev_auth_enabled or env_name == "production":
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dev auth is disabled")
-    if not x_dev_api_token or x_dev_api_token.strip() != settings.api_bootstrap_token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid dev bootstrap token")
-
-    allowed_roles = _parse_csv_env(settings.dev_allowed_roles)
-    resolved_role = (requested_role or settings.default_user_role).strip().lower()
-    if resolved_role not in allowed_roles:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Requested role '{requested_role}' is not allowed for dev auth",
-        )
-
-    resolved_tenant = (tenant_id or settings.default_tenant_id).strip()
-    resolved_user = (user_id or settings.default_user_id).strip()
-    resolved_email = (email or settings.default_user_email or "").strip() or None
-    token, expires_at = create_access_token(
-        user_id=resolved_user,
-        tenant_id=resolved_tenant,
-        role=resolved_role,
-        email=resolved_email,
-        settings=settings,
-    )
-    user = _claims_to_user_context(decode_access_token(token, settings))
-    return token, expires_at, user
-
-
 DbSessionDep = Annotated[Session, Depends(get_db)]
 CurrentUserDep = Annotated[UserContext, Depends(get_current_user)]
 ReviewerUserDep = Annotated[UserContext, Depends(require_reviewer_role)]
 AdminReviewerDep = Annotated[UserContext, Depends(require_roles("admin", "reviewer"))]
 AdminDep = Annotated[UserContext, Depends(require_roles("admin"))]
-DevBootstrapTokenDep = Annotated[str | None, Header(alias="X-Dev-API-Token")]

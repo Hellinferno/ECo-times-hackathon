@@ -24,12 +24,13 @@ _OUTPUT_DIR = str(Path(__file__).resolve().parent.parent.parent.parent / "data" 
 
 
 class DueDiligenceAgent(BaseAgent):
-    def __init__(self, deal_id: str, input_payload: dict):
+    def __init__(self, deal_id: str, input_payload: dict, run_id: str | None = None):
         super().__init__(
             agent_type="due_diligence",
             task_name="dd_report",
             deal_id=deal_id,
             input_payload=input_payload,
+            run_id=run_id,
         )
         self.system_prompt = PromptBuilder.get_system_prompt("due_diligence")
 

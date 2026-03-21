@@ -80,12 +80,13 @@ class OrchestratorAgent(BaseAgent):
         "meeting_notes": "coordination",
     }
 
-    def __init__(self, deal_id: str, input_payload: Dict[str, Any]):
+    def __init__(self, deal_id: str, input_payload: Dict[str, Any], run_id: str | None = None):
         super().__init__(
             agent_type="orchestrator",
             task_name="route_task",
             deal_id=deal_id,
-            input_payload=input_payload
+            input_payload=input_payload,
+            run_id=run_id,
         )
 
     @staticmethod

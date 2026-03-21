@@ -7,8 +7,10 @@ from pathlib import Path
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from openai import OpenAI
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
+
+from database import SessionLocal
+from model_registry import DEFAULT_MODEL_NAME, DEFAULT_PROMPT_VERSION, RuntimeModelConfig, get_active_runtime_config
 
 logger = logging.getLogger(__name__)
 
@@ -29,28 +31,7 @@ _load_env_files()
 
 # Check if API keys are available
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-NVIDIA_API_KEY = os.environ.get("NVIDIA_API_KEY", "")
-NVIDIA_TIMEOUT_SECONDS = float(os.environ.get("NVIDIA_TIMEOUT_SECONDS", "8"))
-NVIDIA_FALLBACK_ENABLED = os.environ.get("NVIDIA_FALLBACK_ENABLED", "true").lower() not in {
-    "0",
-    "false",
-    "no",
-    "off",
-}
-
-# Primary Client: Gemini (only if key exists)
-gemini_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
-
-# Fallback Client: NVIDIA OpenAI endpoint (DeepSeek)
-nvidia_client = (
-    OpenAI(
-        base_url="https://integrate.api.nvidia.com/v1",
-        api_key=NVIDIA_API_KEY,
-        timeout=NVIDIA_TIMEOUT_SECONDS,
-    )
-    if NVIDIA_API_KEY and NVIDIA_FALLBACK_ENABLED
-    else None
-)
+_gemini_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
 
 def _sanitize_error(err: Exception) -> str:
@@ -76,6 +57,26 @@ def _is_transient_error(err: Exception) -> bool:
     return any(x in msg for x in ["500", "502", "503", "504", "timeout", "connection", "unavailable", "internal"])
 
 
+def resolve_llm_runtime_config(
+    *,
+    purpose: str | None = None,
+    tenant_id: str | None = None,
+) -> RuntimeModelConfig:
+    if purpose:
+        with SessionLocal() as db:
+            return get_active_runtime_config(db, tenant_id=tenant_id, purpose=purpose)
+
+    return RuntimeModelConfig(
+        registry_id=None,
+        tenant_id=tenant_id,
+        purpose=purpose or "default",
+        provider="google-genai",
+        model_name=DEFAULT_MODEL_NAME,
+        prompt_version=DEFAULT_PROMPT_VERSION,
+        config={},
+    )
+
+
 @retry(
     retry=retry_if_exception(_is_transient_error),
     wait=wait_exponential(multiplier=1, min=2, max=10),
@@ -83,9 +84,40 @@ def _is_transient_error(err: Exception) -> bool:
     reraise=True,
 )
 def _call_gemini(system_prompt: str, user_prompt: str) -> str:
+    return _call_gemini_with_config(
+        system_prompt,
+        user_prompt,
+        RuntimeModelConfig(
+            registry_id=None,
+            tenant_id=None,
+            purpose="default",
+            provider="google-genai",
+            model_name=DEFAULT_MODEL_NAME,
+            prompt_version=DEFAULT_PROMPT_VERSION,
+            config={},
+        ),
+    )
+
+
+@retry(
+    retry=retry_if_exception(_is_transient_error),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    stop=stop_after_attempt(3),
+    reraise=True,
+)
+def _call_gemini_with_config(
+    system_prompt: str,
+    user_prompt: str,
+    runtime_config: RuntimeModelConfig,
+) -> str:
     """Call Gemini with automatic retry on transient errors (up to 3 attempts)."""
-    response = gemini_client.models.generate_content(
-        model="gemini-2.5-flash",
+    if runtime_config.provider != "google-genai":
+        raise RuntimeError(f"Unsupported LLM provider for Phase 0/1: {runtime_config.provider}")
+    if not GEMINI_API_KEY or _gemini_client is None:
+        raise RuntimeError("GEMINI_API_KEY is required for Gemini extraction and validation.")
+
+    response = _gemini_client.models.generate_content(
+        model=runtime_config.model_name,
         contents=user_prompt,
         config=types.GenerateContentConfig(
             system_instruction=system_prompt,
@@ -95,49 +127,32 @@ def _call_gemini(system_prompt: str, user_prompt: str) -> str:
     return response.text
 
 
-def ask_llm(system_prompt: str, user_prompt: str) -> str:
+def ask_llm(
+    system_prompt: str,
+    user_prompt: str,
+    *,
+    purpose: str | None = None,
+    tenant_id: str | None = None,
+) -> str:
     """
-    Submit prompt to Gemini as primary model.
+    Submit prompt to Gemini using the active runtime configuration.
     Transient errors are retried up to 3x with exponential backoff via tenacity.
-    Quota/rate limit errors go straight to deterministic fallback.
-    If Gemini fails entirely, uses NVIDIA DeepSeek fallback.
+    No secondary LLM fallback is allowed in the Phase 0/1 extraction pipeline.
     """
-    if not GEMINI_API_KEY and not NVIDIA_API_KEY:
+    runtime_config = resolve_llm_runtime_config(purpose=purpose, tenant_id=tenant_id)
+
+    if not GEMINI_API_KEY:
         logger.error("[LLM Engine] No API keys configured")
-        raise RuntimeError("No API keys found. For production readiness, fallback has been disabled. Please configure GEMINI_API_KEY.")
+        raise RuntimeError("No API keys found. Please configure GEMINI_API_KEY.")
 
     try:
-        if gemini_client:
-            return _call_gemini(system_prompt, user_prompt)
-        raise Exception("Gemini API key not configured")
+        return _call_gemini_with_config(system_prompt, user_prompt, runtime_config)
     except Exception as e_gemini:
         if _is_quota_or_rate_limit_error(e_gemini):
             logger.error("[LLM Engine] Primary LLM quota/rate limit: %s", _sanitize_error(e_gemini))
             raise RuntimeError(f"Rate limit or quota exceeded: {_sanitize_error(e_gemini)}")
 
-        logger.warning("[LLM Engine] Primary LLM failed: %s. Attempting fallback.", _sanitize_error(e_gemini))
-
-        if nvidia_client:
-            try:
-                completion = nvidia_client.chat.completions.create(
-                    model="deepseek-ai/deepseek-v3.2",
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt},
-                    ],
-                    temperature=0.0,
-                    top_p=0.95,
-                    max_tokens=8192,
-                    timeout=NVIDIA_TIMEOUT_SECONDS,
-                    extra_body={"chat_template_kwargs": {"thinking": True}},
-                    stream=False,
-                )
-                return completion.choices[0].message.content
-            except Exception as e_nvidia:
-                logger.error("[LLM Engine] Fallback LLM also failed: %s", _sanitize_error(e_nvidia))
-                raise RuntimeError(f"Both primary and fallback LLMs failed: {e_gemini} | {e_nvidia}")
-
-        logger.error("[LLM Engine] LLM failed and no alternative client configured")
+        logger.error("[LLM Engine] Gemini call failed: %s", _sanitize_error(e_gemini))
         raise RuntimeError(f"Primary LLM failed: {_sanitize_error(e_gemini)}")
 
 

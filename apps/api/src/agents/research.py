@@ -20,7 +20,7 @@ _OUTPUT_DIR = str(Path(__file__).resolve().parent.parent.parent.parent / "data" 
 
 
 class ResearchAgent(BaseAgent):
-    def __init__(self, deal_id: str, input_payload: dict):
+    def __init__(self, deal_id: str, input_payload: dict, run_id: str | None = None):
         # task_name can be "industry_brief" or "buyer_universe"
         task = input_payload.get("task_name", "industry_brief")
         super().__init__(
@@ -28,6 +28,7 @@ class ResearchAgent(BaseAgent):
             task_name=task,
             deal_id=deal_id,
             input_payload=input_payload,
+            run_id=run_id,
         )
         self.system_prompt = PromptBuilder.get_system_prompt("research")
 

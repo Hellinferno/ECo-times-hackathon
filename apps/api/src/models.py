@@ -1,41 +1,34 @@
 import re
 from datetime import datetime, timezone
-from typing import Annotated, Any, Dict, List, Literal, Optional
+from typing import Any, Dict, Generic, Literal, Optional, TypeVar
 
 from pydantic import BaseModel, Field, field_validator
-
-# ---------------------------------------------------------------------------
-# Constrained scalar types reused across schemas
-# ---------------------------------------------------------------------------
 
 DealTypeStr = Literal[
     "ipo", "ma", "lbo", "debt_raise", "equity_raise",
     "restructuring", "merger", "acquisition", "secondary",
-    "private_placement", "other"
+    "private_placement", "other",
 ]
 
 DealStageStr = Literal[
-    "preliminary", "in_progress", "due_diligence", "final", "closed"
+    "preliminary", "in_progress", "due_diligence", "final", "closed",
 ]
 
 PriorityStr = Literal["low", "medium", "high"]
-
 ReviewStatusStr = Literal["draft", "in_review", "approved", "rejected"]
 UserRoleStr = Literal["analyst", "reviewer", "admin"]
+RegistryStatusStr = Literal["staged", "active", "rollback"]
+ValidationStatusStr = Literal["pending", "passed", "failed", "warning", "skipped"]
 
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
+T = TypeVar("T")
 
 
 def _strip_html(value: Optional[str]) -> Optional[str]:
-    """Remove HTML tags from a string to prevent XSS if notes are ever rendered."""
     if value is None:
         return None
     return _HTML_TAG_RE.sub("", value).strip()
 
-
-# ---------------------------------------------------------------------------
-# Request Schemas
-# ---------------------------------------------------------------------------
 
 class DealCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=80)
@@ -47,13 +40,13 @@ class DealCreate(BaseModel):
 
     @field_validator("name", "company_name", "industry", mode="before")
     @classmethod
-    def strip_whitespace(cls, v: str) -> str:
-        return v.strip() if isinstance(v, str) else v
+    def strip_whitespace(cls, value: str) -> str:
+        return value.strip() if isinstance(value, str) else value
 
     @field_validator("notes", mode="before")
     @classmethod
-    def sanitize_notes(cls, v):
-        return _strip_html(v)
+    def sanitize_notes(cls, value):
+        return _strip_html(value)
 
 
 class DealUpdate(BaseModel):
@@ -66,49 +59,23 @@ class DealUpdate(BaseModel):
 
     @field_validator("name", "company_name", "industry", mode="before")
     @classmethod
-    def strip_whitespace(cls, v):
-        return v.strip() if isinstance(v, str) else v
+    def strip_optional_whitespace(cls, value):
+        return value.strip() if isinstance(value, str) else value
 
     @field_validator("notes", mode="before")
     @classmethod
-    def sanitize_notes(cls, v):
-        return _strip_html(v)
+    def sanitize_notes(cls, value):
+        return _strip_html(value)
 
 
-class AgentRunCreate(BaseModel):
-    agent_type: str = Field(..., min_length=1, max_length=40)
-    task_name: str = Field(..., min_length=1, max_length=80)
-    parameters: Dict[str, Any] = Field(default_factory=dict)
+class LoginRequest(BaseModel):
+    username: str = Field(..., min_length=1, max_length=120)
+    password: str = Field(..., min_length=1, max_length=120)
 
-
-class TaskCreate(BaseModel):
-    title: str = Field(..., min_length=1, max_length=200)
-    description: Optional[str] = Field(None, max_length=2000)
-    owner: Optional[str] = Field(None, max_length=80)
-    priority: PriorityStr = "medium"
-    due_date: Optional[str] = None
-
-
-class OutputReviewUpdate(BaseModel):
-    review_status: ReviewStatusStr
-    reviewer_notes: Optional[str] = Field(None, max_length=2000)
-
-    @field_validator("reviewer_notes", mode="before")
+    @field_validator("username", mode="before")
     @classmethod
-    def sanitize_reviewer_notes(cls, v):
-        return _strip_html(v)
-
-
-class DevAuthTokenRequest(BaseModel):
-    requested_role: UserRoleStr = "analyst"
-    tenant_id: Optional[str] = Field(None, min_length=1, max_length=80)
-    user_id: Optional[str] = Field(None, min_length=1, max_length=80)
-    email: Optional[str] = Field(None, max_length=120)
-
-    @field_validator("tenant_id", "user_id", "email", mode="before")
-    @classmethod
-    def strip_optional_whitespace(cls, v):
-        return v.strip() if isinstance(v, str) else v
+    def strip_username(cls, value: str) -> str:
+        return value.strip() if isinstance(value, str) else value
 
 
 class CurrentUserResponse(BaseModel):
@@ -119,6 +86,23 @@ class CurrentUserResponse(BaseModel):
     token_id: Optional[str] = None
 
 
+class LoginResponse(BaseModel):
+    user: CurrentUserResponse
+    session_expires_at: str
+
+
+class DevAuthTokenRequest(BaseModel):
+    requested_role: UserRoleStr = "analyst"
+    tenant_id: Optional[str] = Field(None, min_length=1, max_length=80)
+    user_id: Optional[str] = Field(None, min_length=1, max_length=80)
+    email: Optional[str] = Field(None, max_length=120)
+
+    @field_validator("tenant_id", "user_id", "email", mode="before")
+    @classmethod
+    def strip_optional_whitespace(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
+
 class AuthTokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -126,14 +110,119 @@ class AuthTokenResponse(BaseModel):
     user: CurrentUserResponse
 
 
-# ---------------------------------------------------------------------------
-# Response Envelopes
-# ---------------------------------------------------------------------------
+class OutputReviewUpdate(BaseModel):
+    review_status: ReviewStatusStr
+    reviewer_notes: Optional[str] = Field(None, max_length=2000)
+
+    @field_validator("reviewer_notes", mode="before")
+    @classmethod
+    def sanitize_reviewer_notes(cls, value):
+        return _strip_html(value)
+
+
+class ExtractionField(BaseModel, Generic[T]):
+    value: Optional[T] = None
+    confidence: float = Field(ge=0.0, le=1.0)
+    source: str = Field(min_length=1)
+    reasoning: Optional[str] = None
+
+
+class PartialYearRunRateValue(BaseModel):
+    partial_quarters_reported: Optional[int] = Field(default=None, ge=1, le=4)
+    fiscal_year_partial: Optional[int] = None
+    ytd_revenue_inr: Optional[float] = None
+    implied_annual_run_rate: Optional[float] = None
+    run_rate_growth_vs_last_fy: Optional[float] = None
+
+
+class GeminiExtractionResponse(BaseModel):
+    reconciliation_log: str = ""
+    company_legal_form: ExtractionField[str | None]
+    listing_status: ExtractionField[str | None]
+    cin: ExtractionField[str | None]
+    historical_revenues: ExtractionField[list[float]]
+    historical_ebitda_margins: ExtractionField[list[float]]
+    net_debt: ExtractionField[float | None]
+    total_borrowings: ExtractionField[float | None]
+    ccps_liability: ExtractionField[float | None]
+    lease_liabilities: ExtractionField[float | None]
+    lease_liabilities_current: ExtractionField[float | None]
+    lease_liabilities_noncurrent: ExtractionField[float | None]
+    cash_and_equivalents: ExtractionField[float | None]
+    partial_year_run_rate: ExtractionField[PartialYearRunRateValue | None]
+    shares_outstanding: ExtractionField[float | None]
+    diluted_shares_outstanding: ExtractionField[float | None]
+    cap_ex_percent_rev: ExtractionField[float | None]
+    da_percent_rev: ExtractionField[float | None]
+    debt_to_equity: ExtractionField[float | None]
+    beta: ExtractionField[float | None]
+    discount_rate_reference: ExtractionField[float | None]
+    forecast_revenue_growth_low: ExtractionField[float | None]
+    forecast_revenue_growth_high: ExtractionField[float | None]
+    terminal_growth_reference: ExtractionField[float | None]
+    base_fy: ExtractionField[int | None]
+    reporting_unit: ExtractionField[str | None]
+    industry_sector: ExtractionField[str | None]
+    profit_after_tax: ExtractionField[float | None]
+    basic_eps: ExtractionField[float | None]
+    operating_cash_flow: ExtractionField[float | None]
+    segment_revenues: ExtractionField[dict[str, float] | None]
+    segment_ebitda_margins: ExtractionField[dict[str, float] | None]
+    currency: str = "INR"
+
+
+class ExtractionValidationCheck(BaseModel):
+    name: str
+    passed: bool
+    blocking: bool = False
+    details: str
+    observed_value: Optional[Any] = None
+
+
+class ExtractionValidatorReport(BaseModel):
+    status: Literal["passed", "failed", "skipped"]
+    summary: str
+    blocking_issues: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    checks: list[ExtractionValidationCheck] = Field(default_factory=list)
+    source_summary: dict[str, Any] = Field(default_factory=dict)
+
+
+class ModelRegistryStageRequest(BaseModel):
+    provider: str = Field(min_length=1, max_length=80)
+    model_name: str = Field(min_length=1, max_length=120)
+    prompt_version: str = Field(min_length=1, max_length=80)
+    config: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ModelRegistryPromoteRequest(BaseModel):
+    entry_id: str = Field(min_length=1, max_length=80)
+
+
+class ModelRegistryRollbackRequest(BaseModel):
+    entry_id: Optional[str] = Field(default=None, min_length=1, max_length=80)
+
+
+class ModelRegistryEntryResponse(BaseModel):
+    id: str
+    tenant_id: Optional[str] = None
+    purpose: str
+    provider: str
+    model_name: str
+    prompt_version: str
+    status: RegistryStatusStr
+    config: Dict[str, Any] = Field(default_factory=dict)
+    validation_status: ValidationStatusStr = "pending"
+    validation_report: Dict[str, Any] = Field(default_factory=dict)
+    rollback_from_id: Optional[str] = None
+    created_by: Optional[str] = None
+    promoted_at: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
 
 class Meta(BaseModel):
-    timestamp: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     request_id: str
 
 
@@ -146,6 +235,6 @@ class APIResponse(BaseModel):
 
 class APIResponseList(BaseModel):
     success: bool
-    data: Dict[str, Any]  # e.g. {"deals": [...], "total": 1, "limit": 20, "offset": 0}
+    data: Dict[str, Any]
     error: Optional[Dict[str, Any]] = None
     meta: Meta

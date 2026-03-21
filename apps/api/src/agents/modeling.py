@@ -19,12 +19,13 @@ from store import store, Output, ExtractionAudit
 
 
 class FinancialModelingAgent(BaseAgent):
-    def __init__(self, deal_id: str, input_payload: Dict[str, Any]):
+    def __init__(self, deal_id: str, input_payload: Dict[str, Any], run_id: str | None = None):
         super().__init__(
             agent_type="modeling",
             task_name=input_payload.get("task_name", "dcf_model"),
             deal_id=deal_id,
             input_payload=input_payload,
+            run_id=run_id,
         )
         self.system_prompt = PromptBuilder.get_system_prompt(self.agent_type)
         self.excel_tool = WorkbookBuilder()

@@ -34,12 +34,13 @@ _CIM_SECTIONS = [
 
 
 class DocDrafterAgent(BaseAgent):
-    def __init__(self, deal_id: str, input_payload: dict):
+    def __init__(self, deal_id: str, input_payload: dict, run_id: str | None = None):
         super().__init__(
             agent_type="doc_drafter",
             task_name="cim_draft",
             deal_id=deal_id,
             input_payload=input_payload,
+            run_id=run_id,
         )
         self.system_prompt = PromptBuilder.get_system_prompt("doc_drafter")
 

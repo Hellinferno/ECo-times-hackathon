@@ -57,6 +57,12 @@ def _run_from_model(model: AgentRunModel) -> AgentRun:
         reasoning_steps=model.reasoning_steps or [],
         confidence_score=model.confidence_score,
         error_message=model.error_message,
+        model_provider=model.model_provider,
+        model_name=model.model_name,
+        prompt_version=model.prompt_version,
+        validator_status=model.validator_status or "pending",
+        validator_report=model.validator_report or {},
+        checkpoint_status=model.checkpoint_status or "pending",
         created_at=model.created_at,
     )
 
@@ -156,6 +162,12 @@ def persist_run_bundle(db: Session, run_id: str) -> Optional[AgentRunModel]:
     run_model.reasoning_steps = run_record.reasoning_steps
     run_model.confidence_score = run_record.confidence_score
     run_model.error_message = run_record.error_message
+    run_model.model_provider = run_record.model_provider
+    run_model.model_name = run_record.model_name
+    run_model.prompt_version = run_record.prompt_version
+    run_model.validator_status = run_record.validator_status
+    run_model.validator_report = run_record.validator_report
+    run_model.checkpoint_status = run_record.checkpoint_status
     db.flush()
 
     for output in store.outputs.values():

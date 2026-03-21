@@ -65,6 +65,12 @@ class AgentRunModel(Base):
     reasoning_steps = Column(JSON, default=list) # Using JSON for Postgres/SQLite compat
     confidence_score = Column(Float, nullable=True)
     error_message = Column(String, nullable=True)
+    model_provider = Column(String, nullable=True)
+    model_name = Column(String, nullable=True)
+    prompt_version = Column(String, nullable=True)
+    validator_status = Column(String, default="pending")
+    validator_report = Column(JSON, nullable=True)
+    checkpoint_status = Column(String, default="pending")
     created_at = Column(DateTime, default=_utcnow)
     
     deal = relationship("DealModel", back_populates="agent_runs")
@@ -168,5 +174,25 @@ class WebhookModel(Base):
     event_types = Column(JSON, nullable=True)
     is_active = Column(Boolean, default=True)
     description = Column(String, nullable=True)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+
+class ModelRegistryModel(Base):
+    __tablename__ = "model_registry"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id = Column(String, index=True, nullable=True)
+    purpose = Column(String, index=True, nullable=False)
+    provider = Column(String, nullable=False)
+    model_name = Column(String, nullable=False)
+    prompt_version = Column(String, nullable=False)
+    status = Column(String, default="staged")
+    config = Column(JSON, default=dict)
+    validation_status = Column(String, default="pending")
+    validation_report = Column(JSON, default=dict)
+    rollback_from_id = Column(String, nullable=True)
+    created_by = Column(String, nullable=True)
+    promoted_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)

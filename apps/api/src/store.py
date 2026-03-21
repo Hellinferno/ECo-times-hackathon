@@ -63,6 +63,12 @@ class AgentRun:
     reasoning_steps: List[Dict] = field(default_factory=list)
     confidence_score: Optional[float] = None
     error_message: Optional[str] = None
+    model_provider: Optional[str] = None
+    model_name: Optional[str] = None
+    prompt_version: Optional[str] = None
+    validator_status: str = "pending"
+    validator_report: Optional[Dict[str, Any]] = None
+    checkpoint_status: str = "pending"
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     created_at: datetime = field(default_factory=_utcnow)
 
