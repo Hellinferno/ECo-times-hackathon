@@ -13,6 +13,7 @@ const api = axios.create({
         'Content-Type': 'application/json',
     },
     timeout: DEFAULT_API_TIMEOUT_MS,
+    withCredentials: true,
 });
 
 const authApi = axios.create({
@@ -21,13 +22,14 @@ const authApi = axios.create({
         'Content-Type': 'application/json',
     },
     timeout: DEFAULT_API_TIMEOUT_MS,
+    withCredentials: true,
 });
 
 function looksLikeJwt(token: string | null | undefined): boolean {
     return Boolean(token && token.split('.').length === 3);
 }
 
-let accessToken: string | null = looksLikeJwt(BOOTSTRAP_TOKEN) ? BOOTSTRAP_TOKEN : null;
+const accessToken: string | null = looksLikeJwt(BOOTSTRAP_TOKEN) ? BOOTSTRAP_TOKEN : null;
 let authBootstrapPromise: Promise<string | null> | null = null;
 let currentUserCache: CurrentUserInfo | null = null;
 
@@ -36,18 +38,14 @@ async function bootstrapDevToken(): Promise<string | null> {
         return accessToken;
     }
 
-    const res = await authApi.post<APIResponse<AuthTokenSession>>(
-        '/auth/dev-token',
-        { requested_role: DEV_AUTH_ROLE },
-        {
-            headers: {
-                'X-Dev-API-Token': BOOTSTRAP_TOKEN,
-            },
-        }
+    // Use the backend's /auth/login endpoint with demo credentials
+    const res = await authApi.post<APIResponse<LoginResponse>>(
+        '/auth/login',
+        { username: DEV_AUTH_ROLE, password: 'AIBAA-demo-2026!' },
     );
-    accessToken = res.data.data.access_token;
+    // The backend sets a session cookie; also extract user for cache
     currentUserCache = res.data.data.user;
-    return accessToken;
+    return 'session-cookie-auth';
 }
 
 export async function ensureAuthToken(): Promise<string | null> {
@@ -253,11 +251,9 @@ export interface CurrentUserInfo {
     token_id?: string | null;
 }
 
-interface AuthTokenSession {
-    access_token: string;
-    token_type: string;
-    expires_at: string;
+interface LoginResponse {
     user: CurrentUserInfo;
+    session_expires_at: string;
 }
 
 interface APIResponse<T> {

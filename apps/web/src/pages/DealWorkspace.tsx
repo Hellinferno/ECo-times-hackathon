@@ -6,6 +6,8 @@ import DocumentsTab from '../components/workspace/DocumentsTab'
 import AgentsTab from '../components/workspace/AgentsTab'
 import OutputsTab from '../components/workspace/OutputsTab'
 import TasksTab from '../components/workspace/TasksTab'
+import LoadingScreen from '../components/ui/LoadingScreen'
+import StatusBadge from '../components/ui/StatusBadge'
 
 type TabKey = 'overview' | 'documents' | 'agents' | 'outputs' | 'tasks'
 
@@ -43,70 +45,84 @@ export default function DealWorkspace() {
 
     useEffect(() => { loadDeal() }, [loadDeal])
 
-    if (loading) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-black text-neutral-500">
-                <div className="spinner mb-4 border-t-white mix-blend-difference" />
-                <span className="font-mono text-xs uppercase tracking-widest text-neutral-400">Loading Workspace...</span>
-            </div>
-        )
-    }
+    if (loading) return <LoadingScreen label="Loading Workspace" />
 
     if (!deal) {
         return (
-            <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white">
-                <p className="font-mono text-xs uppercase tracking-widest text-neutral-500 mb-4">Deal not found</p>
-                <button 
-                    className="border border-neutral-700 px-6 py-2 hover:bg-white hover:text-black transition-colors font-mono uppercase text-xs tracking-widest"
-                    onClick={() => navigate('/')}
-                >
-                    Return to Pipeline
-                </button>
+            <div className="flex flex-col items-center justify-center" style={{ minHeight: '60vh', gap: 16 }}>
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                    Deal not found
+                </p>
+                <button className="btn-secondary" onClick={() => navigate('/')}>Return to Pipeline</button>
             </div>
         )
     }
 
     return (
-        <div className="min-h-screen bg-black text-white font-sans selection:bg-white selection:text-black">
-            {/* Top Bar */}
-            <div className="px-6 md:px-10 py-5 border-b border-neutral-800 flex items-start md:items-center justify-between flex-col md:flex-row gap-4 bg-black sticky top-0 z-10">
-                <div className="flex items-center gap-4">
-                    <button 
-                        className="text-neutral-500 hover:text-white transition-colors border border-transparent hover:border-neutral-800 p-2 -ml-2" 
-                        onClick={() => navigate('/')}
-                        title="Back to Pipeline"
-                    >
-                        <ArrowLeft size={16} />
-                    </button>
-                    <div>
-                        <h1 className="text-xl font-medium tracking-tight m-0 text-white flex items-center gap-3">
-                            {deal.name}
-                        </h1>
-                        <p className="text-neutral-500 text-xs font-mono uppercase tracking-widest mt-1">
-                            {deal.company_name} <span className="mx-1 opacity-50">·</span> {deal.deal_type}
-                        </p>
+        <div className="animate-fade-in" style={{ minHeight: '100%' }}>
+            {/* Deal Header */}
+            <div
+                className="px-6 md:px-10 py-5"
+                style={{ borderBottom: '1px solid var(--border-primary)' }}
+            >
+                <div className="flex items-start md:items-center justify-between flex-col md:flex-row gap-4 max-w-[1400px] mx-auto">
+                    <div className="flex items-center gap-4">
+                        <button
+                            className="cursor-pointer flex items-center justify-center flex-shrink-0"
+                            style={{
+                                background: 'transparent',
+                                border: '1px solid var(--border-primary)',
+                                color: 'var(--text-muted)',
+                                padding: 7,
+                                borderRadius: 'var(--radius-sm)',
+                                transition: 'color 0.15s',
+                            }}
+                            onClick={() => navigate('/')}
+                            title="Back to Pipeline"
+                            onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-primary)' }}
+                            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)' }}
+                        >
+                            <ArrowLeft size={14} />
+                        </button>
+                        <div>
+                            <h1 style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.02em', margin: 0, lineHeight: 1.3 }}>
+                                {deal.name}
+                            </h1>
+                            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2, fontFamily: "'JetBrains Mono', monospace" }}>
+                                {deal.company_name} · {deal.deal_type.toUpperCase()}
+                            </p>
+                        </div>
                     </div>
-                </div>
-                
-                <div className="flex flex-wrap gap-2 md:gap-3">
-                    {currentUser && <span className="badge badge-amber">{currentUser.role}</span>}
-                    <span className="badge badge-indigo">{deal.deal_type}</span>
-                    <span className="badge badge-emerald">{deal.deal_stage}</span>
+
+                    <div className="flex flex-wrap gap-2">
+                        {currentUser && <StatusBadge variant="warning" dot>{currentUser.role}</StatusBadge>}
+                        <StatusBadge variant="accent">{deal.deal_type}</StatusBadge>
+                        <StatusBadge variant={deal.deal_stage === 'active' ? 'positive' : deal.deal_stage === 'preliminary' ? 'accent' : 'default'} dot>{deal.deal_stage}</StatusBadge>
+                    </div>
                 </div>
             </div>
 
-            {/* Tab Nav Grid Box */}
-            <div className="border-b border-neutral-800 bg-black overflow-x-auto">
-                <div className="flex px-6 md:px-10 min-w-max">
+            {/* Tab Navigation */}
+            <div style={{ borderBottom: '1px solid var(--border-primary)' }}>
+                <div className="flex px-6 md:px-10 max-w-[1400px] mx-auto overflow-x-auto">
                     {TABS.map(tab => (
                         <button
                             key={tab.key}
-                            className={`flex items-center gap-2 px-6 py-4 text-[10px] font-mono uppercase tracking-widest transition-colors border-b-2
-                                ${activeTab === tab.key 
-                                    ? 'text-white border-white' 
-                                    : 'text-neutral-500 border-transparent hover:text-neutral-300 hover:border-neutral-800'
-                                }`}
+                            className="flex items-center gap-2 cursor-pointer"
+                            style={{
+                                padding: '12px 18px',
+                                fontSize: 12,
+                                fontWeight: activeTab === tab.key ? 600 : 400,
+                                color: activeTab === tab.key ? 'var(--text-primary)' : 'var(--text-muted)',
+                                background: 'transparent',
+                                border: 'none',
+                                borderBottom: activeTab === tab.key ? '1px solid var(--text-primary)' : '1px solid transparent',
+                                whiteSpace: 'nowrap',
+                                transition: 'color 0.15s',
+                            }}
                             onClick={() => setActiveTab(tab.key)}
+                            onMouseEnter={e => { if (activeTab !== tab.key) e.currentTarget.style.color = 'var(--text-secondary)' }}
+                            onMouseLeave={e => { if (activeTab !== tab.key) e.currentTarget.style.color = 'var(--text-muted)' }}
                         >
                             {tab.icon} {tab.label}
                         </button>
@@ -114,44 +130,48 @@ export default function DealWorkspace() {
                 </div>
             </div>
 
-            {/* Tab Content Box */}
-            <div className="p-6 md:p-10 max-w-[1400px] mx-auto min-h-[calc(100vh-140px)] flex flex-col">
+            {/* Tab Content */}
+            <div className="p-6 md:p-10 max-w-[1400px] mx-auto">
                 {activeTab === 'overview' && (
-                    <div className="animate-fade-in flex-1">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-neutral-800 border border-neutral-800 mb-8">
+                    <div className="animate-fade-in">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                             {[
-                                { label: 'INDUSTRY', value: deal.industry },
-                                { label: 'STAGE', value: deal.deal_stage },
-                                { label: 'CREATED', value: new Date(deal.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) },
+                                { label: 'Industry', value: deal.industry },
+                                { label: 'Stage', value: deal.deal_stage },
+                                { label: 'Created', value: new Date(deal.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) },
                             ].map((item, i) => (
-                                <div key={i} className="bg-black p-6 md:p-8 flex flex-col justify-between group hover:bg-neutral-950 transition-colors">
-                                    <div className="text-neutral-500 text-[10px] uppercase font-mono tracking-widest mb-4">
+                                <div
+                                    key={i}
+                                    className="glass-card"
+                                    style={{ padding: '20px 24px', animation: `fadeInUp 0.3s ease ${i * 60}ms both` }}
+                                >
+                                    <div style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-muted)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10, fontFamily: "'JetBrains Mono', monospace" }}>
                                         {item.label}
                                     </div>
-                                    <div className="text-xl md:text-2xl font-light tracking-tight text-white">
+                                    <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
                                         {item.value}
                                     </div>
                                 </div>
                             ))}
                         </div>
-                        
+
                         {deal.notes && (
-                            <div className="bg-black border border-neutral-800 p-6 md:p-8">
-                                <div className="text-neutral-500 text-[10px] uppercase font-mono tracking-widest mb-4">
-                                    INTERNAL NOTES
+                            <div className="glass-card" style={{ padding: '20px 24px' }}>
+                                <div style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-muted)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10, fontFamily: "'JetBrains Mono', monospace" }}>
+                                    Internal Notes
                                 </div>
-                                <p className="text-neutral-300 text-sm leading-relaxed whitespace-pre-wrap font-sans max-w-4xl">
+                                <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.7, maxWidth: '80ch', margin: 0, whiteSpace: 'pre-wrap' }}>
                                     {deal.notes}
                                 </p>
                             </div>
                         )}
                     </div>
                 )}
-                
-                {activeTab === 'documents' && <div className="animate-fade-in flex-1"><DocumentsTab dealId={dealId!} /></div>}
-                {activeTab === 'agents' && <div className="animate-fade-in flex-1"><AgentsTab dealId={dealId!} /></div>}
-                {activeTab === 'outputs' && <div className="animate-fade-in flex-1"><OutputsTab dealId={dealId!} /></div>}
-                {activeTab === 'tasks' && <div className="animate-fade-in flex-1"><TasksTab dealId={dealId!} /></div>}
+
+                {activeTab === 'documents' && <div className="animate-fade-in"><DocumentsTab dealId={dealId!} /></div>}
+                {activeTab === 'agents' && <div className="animate-fade-in"><AgentsTab dealId={dealId!} /></div>}
+                {activeTab === 'outputs' && <div className="animate-fade-in"><OutputsTab dealId={dealId!} /></div>}
+                {activeTab === 'tasks' && <div className="animate-fade-in"><TasksTab dealId={dealId!} /></div>}
             </div>
         </div>
     )

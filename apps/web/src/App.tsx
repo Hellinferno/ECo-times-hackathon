@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './components/auth/AuthContext';
 import { AuthGuard } from './components/auth/AuthGuard';
+import AppShell from './components/layout/AppShell';
 import LoginPage from './pages/LoginPage';
 import SettingsPage from './pages/SettingsPage';
 import Dashboard from './pages/Dashboard';
@@ -40,7 +41,9 @@ function BootstrappedApp() {
         path="/"
         element={
           <AuthGuard>
-            <Dashboard />
+            <AppShell>
+              <Dashboard />
+            </AppShell>
           </AuthGuard>
         }
       />
@@ -48,7 +51,9 @@ function BootstrappedApp() {
         path="/deals/:dealId"
         element={
           <AuthGuard>
-            <DealWorkspace />
+            <AppShell>
+              <DealWorkspace />
+            </AppShell>
           </AuthGuard>
         }
       />
@@ -56,7 +61,9 @@ function BootstrappedApp() {
         path="/settings"
         element={
           <AuthGuard>
-            <SettingsPage />
+            <AppShell>
+              <SettingsPage />
+            </AppShell>
           </AuthGuard>
         }
       />
@@ -74,4 +81,3 @@ export default function App() {
     </BrowserRouter>
   );
 }
-

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ensureAuthToken } from '../lib/api';
+import { TrendingUp, ArrowRight, ShieldCheck } from 'lucide-react';
 
 interface Props {
   onLogin: (token: string) => Promise<void>;
@@ -28,31 +29,125 @@ export default function LoginPage({ onLogin }: Props) {
   };
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center font-sans selection:bg-white selection:text-black p-6">
-      <div className="w-full max-w-[400px] bg-black border border-neutral-800 p-8 md:p-12">
-        <h1 className="text-2xl font-medium tracking-tight text-white mb-2">
-          AIBAA
-        </h1>
-        <p className="text-neutral-500 text-xs font-mono uppercase tracking-widest mb-10">
-          AI Investment Banking Analyst Agent
-        </p>
-
-        {error && (
-          <div className="text-white border border-neutral-700 bg-neutral-900 px-4 py-3 text-xs font-mono mb-6">
-            Error: {error}
+    <div className="min-h-screen flex items-center justify-center" style={{ background: '#000000' }}>
+      <div className="w-full animate-fade-in" style={{ maxWidth: 380, padding: '0 24px' }}>
+        {/* Brand */}
+        <div className="flex items-center gap-3 mb-12">
+          <div
+            className="flex items-center justify-center"
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 'var(--radius-sm)',
+              background: '#ffffff',
+              color: '#000000',
+            }}
+          >
+            <TrendingUp size={16} strokeWidth={2.5} />
           </div>
-        )}
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#ffffff', letterSpacing: '-0.03em' }}>
+              AIBAA
+            </div>
+            <div style={{ fontSize: 9, color: '#555', letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>
+              Investment Banking Analyst
+            </div>
+          </div>
+        </div>
 
-        <button
-          className="w-full bg-white text-black py-3 text-xs font-mono uppercase tracking-widest hover:bg-neutral-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-h-[44px]"
-          onClick={handleDevLogin}
-          disabled={loading}
+        {/* Login Card */}
+        <div
+          style={{
+            background: 'var(--bg-primary)',
+            border: '1px solid var(--border-primary)',
+            borderRadius: 'var(--radius-md)',
+            padding: '32px 28px',
+          }}
         >
-          {loading ? <div className="spinner border-black border-t-transparent w-4 h-4" /> : 'Sign in (Dev Mode)'}
-        </button>
+          <h2
+            style={{
+              fontSize: 20,
+              fontWeight: 600,
+              color: '#ffffff',
+              marginBottom: 4,
+              letterSpacing: '-0.02em',
+            }}
+          >
+            Sign in
+          </h2>
+          <p
+            style={{
+              fontSize: 13,
+              color: 'var(--text-muted)',
+              marginBottom: 28,
+            }}
+          >
+            Access your deal pipeline
+          </p>
 
-        <p className="text-neutral-600 text-[10px] uppercase font-mono tracking-widest mt-6 text-center">
-          Development authentication — not for production use
+          {error && (
+            <div
+              className="flex items-center gap-2.5"
+              style={{
+                background: 'var(--negative-bg)',
+                border: '1px solid var(--negative-border)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '10px 12px',
+                marginBottom: 20,
+                fontSize: 12,
+                color: 'var(--negative)',
+              }}
+            >
+              <ShieldCheck size={13} />
+              {error}
+            </div>
+          )}
+
+          <button
+            className="btn-primary w-full flex items-center justify-center gap-2 group"
+            style={{
+              padding: '12px 24px',
+              fontSize: 13,
+              fontWeight: 600,
+              minHeight: 44,
+            }}
+            onClick={handleDevLogin}
+            disabled={loading}
+          >
+            {loading ? (
+              <div className="spinner" style={{ width: 16, height: 16, borderTopColor: '#000' }} />
+            ) : (
+              <>
+                Sign In
+                <ArrowRight size={14} className="transition-transform duration-200 group-hover:translate-x-0.5" />
+              </>
+            )}
+          </button>
+
+          <p
+            style={{
+              fontSize: 10,
+              color: 'var(--text-muted)',
+              textAlign: 'center',
+              marginTop: 16,
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+              fontFamily: "'JetBrains Mono', monospace",
+            }}
+          >
+            Development Mode
+          </p>
+        </div>
+
+        <p
+          style={{
+            fontSize: 11,
+            color: '#333',
+            textAlign: 'center',
+            marginTop: 24,
+          }}
+        >
+          &copy; 2026 AIBAA Platform
         </p>
       </div>
     </div>
