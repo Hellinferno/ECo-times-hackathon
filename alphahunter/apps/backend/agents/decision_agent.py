@@ -17,9 +17,11 @@ class DecisionAgent:
         else:
             bt_score = 0.0
 
-        # Signal count bonus (max 1.0 for 3 signals)
+        # Signal count bonus with dynamic denominator:
+        # legacy mode = 3 core signals, active mode = 7 signals
         signal_count = signal_details.get("signal_count", 0)
-        signal_count_score = min(signal_count / 3.0, 1.0)
+        max_signal_count = max(int(signal_details.get("max_signal_count", 3) or 3), 1)
+        signal_count_score = min(signal_count / float(max_signal_count), 1.0)
 
         # Weights per spec: Signal 40%, Backtest 40%, Signal Count 20%
         if matches > 0:

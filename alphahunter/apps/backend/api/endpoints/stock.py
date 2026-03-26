@@ -76,10 +76,15 @@ def get_stock_detail(symbol: str, db: Session = Depends(get_db)):
     signals_data = None
     backtest_data = None
     if scan_result:
+        extra_signals = scan_result.extra_signals_json or {}
         signals_data = {
             "breakout": scan_result.breakout_triggered,
             "volume_spike": scan_result.volume_spike_triggered,
             "bulk_deal": scan_result.bulk_deal_triggered,
+            "news_sentiment": extra_signals.get("news_sentiment", {}),
+            "social_sentiment": extra_signals.get("social_sentiment", {}),
+            "insider_filing": extra_signals.get("insider_filing", {}),
+            "macro_context": extra_signals.get("macro_context", {}),
             "signal_count": scan_result.signal_count,
             "composite_score": float(scan_result.composite_score) if scan_result.composite_score else None,
             "price": float(scan_result.price) if scan_result.price else None,
@@ -89,6 +94,7 @@ def get_stock_detail(symbol: str, db: Session = Depends(get_db)):
             "breakout_details": scan_result.breakout_details,
             "volume_spike_details": scan_result.volume_spike_details,
             "bulk_deal_details": scan_result.bulk_deal_details,
+            "signal_diagnostics": scan_result.data_quality_json or {},
         }
         backtest_data = {
             "matches": scan_result.backtest_matches,

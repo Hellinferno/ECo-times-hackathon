@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     REDIS_PORT: int = 6379
     
     ANTHROPIC_API_KEY: str = ""
+    MINO_API_KEY: str = ""
+    TINYFISH_RUN_SSE_URL: str = "https://mino.ai/v1/automation/run-sse"
+    TINYFISH_DEFAULT_TIMEOUT_SECS: int = 20
 
     @property
     def DATABASE_URL(self) -> str:

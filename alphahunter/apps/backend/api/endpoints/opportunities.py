@@ -13,7 +13,7 @@ def list_opportunities(limit: int = Query(20, le=100), db: Session = Depends(get
 
     # Subquery / Joining
     decisions = (
-        db.query(Decision, ScanResult.reasoning_text)
+        db.query(Decision, ScanResult)
         .join(ScanResult, Decision.scan_result_id == ScanResult.id)
         .order_by(desc(Decision.confidence))
         .limit(limit)
@@ -21,11 +21,30 @@ def list_opportunities(limit: int = Query(20, le=100), db: Session = Depends(get
     )
 
     payload = []
-    for d, reason in decisions:
+    for d, result in decisions:
+        reason = result.reasoning_text if result else None
         try:
             parsed_reasoning = json.loads(reason) if reason else {}
         except:
             parsed_reasoning = {"llm_summary": reason}
+
+        signals = []
+        if result:
+            if result.breakout_triggered:
+                signals.append("breakout")
+            if result.volume_spike_triggered:
+                signals.append("volume_spike")
+            if result.bulk_deal_triggered:
+                signals.append("bulk_deal")
+            extras = result.extra_signals_json or {}
+            if extras.get("news_sentiment", {}).get("triggered"):
+                signals.append("news_sentiment")
+            if extras.get("social_sentiment", {}).get("triggered"):
+                signals.append("social_sentiment")
+            if extras.get("insider_filing", {}).get("triggered"):
+                signals.append("insider_filing")
+            if extras.get("macro_context", {}).get("triggered"):
+                signals.append("macro_context")
 
         payload.append({
             "decision_id": str(d.decision_id),
@@ -36,6 +55,7 @@ def list_opportunities(limit: int = Query(20, le=100), db: Session = Depends(get
             "target": d.target_price,
             "stop_loss": d.stop_loss,
             "rr_ratio": d.rr_ratio,
+            "signals": signals,
             "reasoning": parsed_reasoning,
             "timestamp": d.decided_at.isoformat()
         })
@@ -81,9 +101,14 @@ def get_opportunity_detail(decision_id: str, db: Session = Depends(get_db)):
                 "breakout": result.breakout_triggered if result else False,
                 "volume": result.volume_spike_triggered if result else False,
                 "bulk": result.bulk_deal_triggered if result else False,
+                "news_sentiment": (result.extra_signals_json or {}).get("news_sentiment", {}) if result else {},
+                "social_sentiment": (result.extra_signals_json or {}).get("social_sentiment", {}) if result else {},
+                "insider_filing": (result.extra_signals_json or {}).get("insider_filing", {}) if result else {},
+                "macro_context": (result.extra_signals_json or {}).get("macro_context", {}) if result else {},
                 "breakout_details": json.loads(result.breakout_details) if result and isinstance(result.breakout_details, str) else (result.breakout_details if result else {}),
                 "volume_details": json.loads(result.volume_spike_details) if result and isinstance(result.volume_spike_details, str) else (result.volume_spike_details if result else {}),
-                "bulk_details": json.loads(result.bulk_deal_details) if result and isinstance(result.bulk_deal_details, str) else (result.bulk_deal_details if result else {})
+                "bulk_details": json.loads(result.bulk_deal_details) if result and isinstance(result.bulk_deal_details, str) else (result.bulk_deal_details if result else {}),
+                "signal_diagnostics": result.data_quality_json if result else {},
             },
             "reasoning": parsed_reasoning
         }

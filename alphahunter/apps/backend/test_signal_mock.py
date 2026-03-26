@@ -1,4 +1,5 @@
 import json
+import datetime
 from loguru import logger
 from agents.signal_agent import SignalAgent
 from agents.data_agent import DataAgent
@@ -35,7 +36,7 @@ def test_signal_agent_mock():
     # Mock bulk deal
     bulk_deals = [
         {
-            "date": "2023-11-05",
+            "date": datetime.date.today().strftime("%Y-%m-%d"),
             "deal_type": "BUY",
             "client_name": "BIG WHALE CAPITAL",
             "price": 105.0,

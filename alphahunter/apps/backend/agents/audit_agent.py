@@ -1,6 +1,5 @@
-import time
 from sqlalchemy.orm import Session
-from models.db import ScanRun, ScanResult, Decision
+from models.db import ScanResult, Decision, ShadowSignalDiff
 from loguru import logger
 
 class AuditAgent:
@@ -13,8 +12,10 @@ class AuditAgent:
             db_result = ScanResult(
                 scan_run_id=scan_run_id,
                 symbol=result_data["symbol"],
-                price=result_data.get("price"),
+                price=result_data.get("price") or result_data.get("current_price"),
                 volume_today=result_data.get("volume_today"),
+                volume_avg_20d=result_data.get("volume_avg_20d"),
+                volume_ratio=result_data.get("volume_ratio"),
                 
                 breakout_triggered=result_data.get("breakout_triggered", False),
                 volume_spike_triggered=result_data.get("volume_spike_triggered", False),
@@ -23,6 +24,8 @@ class AuditAgent:
                 breakout_details=result_data.get("breakout_details", {}),
                 volume_spike_details=result_data.get("volume_spike_details", {}),
                 bulk_deal_details=result_data.get("bulk_deal_details", {}),
+                extra_signals_json=result_data.get("extra_signals", {}),
+                data_quality_json=result_data.get("signal_diagnostics", {}),
                 
                 signal_count=result_data.get("signal_count", 0),
                 composite_score=result_data.get("composite_score", 0),
@@ -31,6 +34,9 @@ class AuditAgent:
                 
                 backtest_matches=result_data.get("backtest_matches", 0),
                 backtest_success_rate=result_data.get("backtest_success_rate", 0),
+                backtest_avg_return=result_data.get("backtest_avg_return", 0),
+                backtest_worst_case=result_data.get("backtest_worst_case", 0),
+                backtest_best_case=result_data.get("backtest_best_case", 0),
                 backtest_cases_json=result_data.get("cases", [])
             )
             self.db.add(db_result)
@@ -64,3 +70,30 @@ class AuditAgent:
         except Exception as e:
             self.db.rollback()
             logger.error(f"Audit log failed for decision {symbol}: {e}")
+
+    def log_shadow_diff(
+        self,
+        scan_run_id: int,
+        symbol: str,
+        legacy_score: float,
+        new_score: float,
+        legacy_action: str,
+        new_action: str,
+        diff_payload: dict,
+    ):
+        """Persist score/action drift between legacy and grouped scoring in shadow mode."""
+        try:
+            row = ShadowSignalDiff(
+                scan_run_id=scan_run_id,
+                symbol=symbol,
+                legacy_score=legacy_score,
+                new_score=new_score,
+                legacy_action=legacy_action,
+                new_action=new_action,
+                diff_payload=diff_payload or {},
+            )
+            self.db.add(row)
+            self.db.commit()
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Shadow diff log failed for {symbol}: {e}")

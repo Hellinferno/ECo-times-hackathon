@@ -22,6 +22,8 @@ class ScanResult(Base):
     breakout_details = Column(JSON)
     volume_spike_details = Column(JSON)
     bulk_deal_details = Column(JSON)
+    extra_signals_json = Column(JSON)
+    data_quality_json = Column(JSON)
 
     signal_count = Column(Integer, nullable=False, default=0)
     composite_score = Column(Numeric(5, 4), index=True)

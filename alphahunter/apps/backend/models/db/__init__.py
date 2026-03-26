@@ -9,9 +9,13 @@ from .watchlist_item import WatchlistItem
 from .alert import Alert
 from .system_setting import SystemSetting
 from .audit_log import AuditLog
+from .external_signal_event import ExternalSignalEvent
+from .web_fetch_run import WebFetchRun
+from .shadow_signal_diff import ShadowSignalDiff
 
 __all__ = [
     "Base", "Stock", "ScanRun", "ScanResult", "Decision", 
     "BulkDeal", "MarketDataCache", "WatchlistItem", 
-    "Alert", "SystemSetting", "AuditLog"
+    "Alert", "SystemSetting", "AuditLog", "ExternalSignalEvent",
+    "WebFetchRun", "ShadowSignalDiff"
 ]
