@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+alembic
+psycopg2-binary
+pytest
+yfinance
+APScheduler
+pydantic
+pydantic-settings
+redis
+anthropic
+tenacity
+celery[redis]
+python-dotenv
+requests
+loguru
