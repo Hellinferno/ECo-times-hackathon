@@ -1,6 +1,6 @@
-# 07 — Monorepo Structure
+# 07 â€” Monorepo Structure
 
-## AlphaHunter AI — Opportunity & Decision Engine
+## AlphaHunter AI â€” Opportunity & Decision Engine
 
 ---
 
@@ -14,252 +14,252 @@ AlphaHunter AI uses a **monorepo** structure with separate packages for the back
 
 ```
 alphahunter/
-├── .github/
-│   └── workflows/
-│       ├── ci.yml                  # CI pipeline (lint, test, build)
-│       └── deploy.yml              # CD pipeline (staging, prod)
-│
-├── apps/
-│   ├── backend/                    # Python FastAPI backend
-│   └── frontend/                   # React + TypeScript frontend
-│
-├── packages/
-│   └── shared/                     # Shared types, constants (future)
-│
-├── scripts/
-│   ├── seed_stocks.py              # Seed NSE stock list into DB
-│   ├── backfill_decisions.py       # Measure outcomes for past decisions
-│   └── dev_setup.sh                # One-command dev environment setup
-│
-├── docker-compose.yml              # Local dev environment
-├── docker-compose.prod.yml         # Production compose
-├── .env.example                    # Environment variable template
-├── .gitignore
-├── README.md
-└── Makefile                        # Dev task shortcuts
+â”œâ”€â”€ .github/
+â”‚   â””â”€â”€ workflows/
+â”‚       â”œâ”€â”€ ci.yml                  # CI pipeline (lint, test, build)
+â”‚       â””â”€â”€ deploy.yml              # CD pipeline (staging, prod)
+â”‚
+â”œâ”€â”€ apps/
+â”‚   â”œâ”€â”€ backend/                    # Python FastAPI backend
+â”‚   â””â”€â”€ frontend/                   # React + TypeScript frontend
+â”‚
+â”œâ”€â”€ packages/
+â”‚   â””â”€â”€ shared/                     # Shared types, constants (future)
+â”‚
+â”œâ”€â”€ scripts/
+â”‚   â”œâ”€â”€ seed_stocks.py              # Seed NSE stock list into DB
+â”‚   â”œâ”€â”€ backfill_decisions.py       # Measure outcomes for past decisions
+â”‚   â””â”€â”€ dev_setup.sh                # One-command dev environment setup
+â”‚
+â”œâ”€â”€ docker-compose.yml              # Local dev environment
+â”œâ”€â”€ docker-compose.prod.yml         # Production compose
+â”œâ”€â”€ .env.example                    # Environment variable template
+â”œâ”€â”€ .gitignore
+â”œâ”€â”€ README.md
+â””â”€â”€ Makefile                        # Dev task shortcuts
 ```
 
 ---
 
-## 3. Backend Structure — `apps/backend/`
+## 3. Backend Structure â€” `apps/backend/`
 
 ```
 apps/backend/
-├── main.py                         # FastAPI app entry point
-├── config.py                       # Settings / environment config
-├── requirements.txt                # Python dependencies
-├── Dockerfile
-├── alembic.ini                     # Database migration config
-│
-├── alembic/
-│   ├── env.py
-│   └── versions/
-│       ├── 001_initial_schema.py
-│       ├── 002_add_bulk_deals.py
-│       └── 003_add_audit_logs.py
-│
-├── api/
-│   ├── __init__.py
-│   ├── router.py                   # Top-level router (mounts all sub-routers)
-│   └── endpoints/
-│       ├── __init__.py
-│       ├── scan.py                 # POST /scan, GET /scan/{id}/status
-│       ├── opportunities.py        # GET /opportunities
-│       ├── stock.py                # GET /stock/{symbol}, /chart
-│       ├── history.py              # GET /history, /{id}, /export
-│       ├── watchlist.py            # GET/POST/DELETE /watchlist
-│       ├── alerts.py               # GET /alerts, POST /alerts/mark-read
-│       ├── settings.py             # GET/PATCH /settings
-│       └── health.py               # GET /health
-│
-├── agents/
-│   ├── __init__.py
-│   ├── scheduler_agent.py          # Scan scheduling & orchestration
-│   ├── data_agent.py               # Market data fetching & caching
-│   ├── signal_agent.py             # Technical + fundamental signal detection
-│   ├── reasoning_agent.py          # LLM explanation generation
-│   ├── backtesting_agent.py        # Historical signal validation
-│   ├── decision_agent.py           # Final decision + trade parameters
-│   └── audit_agent.py             # Decision logging & outcome tracking
-│
-├── models/
-│   ├── __init__.py
-│   ├── db/
-│   │   ├── __init__.py
-│   │   ├── base.py                 # SQLAlchemy Base
-│   │   ├── stock.py                # Stock ORM model
-│   │   ├── scan_run.py             # ScanRun ORM model
-│   │   ├── scan_result.py          # ScanResult ORM model
-│   │   ├── decision.py             # Decision ORM model
-│   │   ├── bulk_deal.py            # BulkDeal ORM model
-│   │   ├── watchlist_item.py       # WatchlistItem ORM model
-│   │   ├── alert.py                # Alert ORM model
-│   │   ├── market_data_cache.py    # MarketDataCache ORM model
-│   │   └── system_setting.py      # SystemSetting ORM model
-│   │
-│   └── schemas/
-│       ├── __init__.py
-│       ├── scan.py                 # Pydantic schemas for scan endpoints
-│       ├── opportunity.py          # Pydantic schemas for opportunity data
-│       ├── stock.py                # Pydantic schemas for stock detail
-│       ├── decision.py             # Pydantic schemas for decisions
-│       ├── watchlist.py            # Pydantic schemas for watchlist
-│       ├── alert.py                # Pydantic schemas for alerts
-│       └── common.py              # Shared schemas (APIResponse, Meta, etc.)
-│
-├── services/
-│   ├── __init__.py
-│   ├── scan_service.py             # Business logic layer for scan operations
-│   ├── stock_service.py            # Business logic for stock detail
-│   ├── history_service.py          # Business logic for decision history
-│   ├── watchlist_service.py        # Business logic for watchlist
-│   └── alert_service.py           # Business logic for alerts
-│
-├── data_sources/
-│   ├── __init__.py
-│   ├── yfinance_client.py          # yfinance wrapper with error handling
-│   ├── nse_client.py               # NSE bulk deals + corporate data
-│   └── cache_client.py            # Redis cache wrapper
-│
-├── core/
-│   ├── __init__.py
-│   ├── database.py                 # DB session factory
-│   ├── redis.py                    # Redis client singleton
-│   ├── celery_app.py               # Celery app instance
-│   ├── logger.py                   # Structured logging setup
-│   └── exceptions.py              # Custom exception classes
-│
-├── tasks/
-│   ├── __init__.py
-│   ├── scan_task.py                # Celery task: run full scan
-│   └── outcome_task.py            # Celery task: measure T+5 outcomes
-│
-└── tests/
-    ├── __init__.py
-    ├── conftest.py                 # Test fixtures
-    ├── unit/
-    │   ├── test_signal_agent.py
-    │   ├── test_backtesting_agent.py
-    │   ├── test_decision_agent.py
-    │   └── test_reasoning_agent.py
-    └── integration/
-        ├── test_scan_api.py
-        ├── test_stock_api.py
-        └── test_history_api.py
+â”œâ”€â”€ main.py                         # FastAPI app entry point
+â”œâ”€â”€ config.py                       # Settings / environment config
+â”œâ”€â”€ requirements.txt                # Python dependencies
+â”œâ”€â”€ Dockerfile
+â”œâ”€â”€ alembic.ini                     # Database migration config
+â”‚
+â”œâ”€â”€ alembic/
+â”‚   â”œâ”€â”€ env.py
+â”‚   â””â”€â”€ versions/
+â”‚       â”œâ”€â”€ 001_initial_schema.py
+â”‚       â”œâ”€â”€ 002_add_bulk_deals.py
+â”‚       â””â”€â”€ 003_add_audit_logs.py
+â”‚
+â”œâ”€â”€ api/
+â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”œâ”€â”€ router.py                   # Top-level router (mounts all sub-routers)
+â”‚   â””â”€â”€ endpoints/
+â”‚       â”œâ”€â”€ __init__.py
+â”‚       â”œâ”€â”€ scan.py                 # POST /scan, GET /scan/{id}/status
+â”‚       â”œâ”€â”€ opportunities.py        # GET /opportunities
+â”‚       â”œâ”€â”€ stock.py                # GET /stock/{symbol}, /chart
+â”‚       â”œâ”€â”€ history.py              # GET /history, /{id}, /export
+â”‚       â”œâ”€â”€ watchlist.py            # GET/POST/DELETE /watchlist
+â”‚       â”œâ”€â”€ alerts.py               # GET /alerts, POST /alerts/mark-read
+â”‚       â”œâ”€â”€ settings.py             # GET/PATCH /settings
+â”‚       â””â”€â”€ health.py               # GET /health
+â”‚
+â”œâ”€â”€ agents/
+â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”œâ”€â”€ scheduler_agent.py          # Scan scheduling & orchestration
+â”‚   â”œâ”€â”€ data_agent.py               # Market data fetching & caching
+â”‚   â”œâ”€â”€ signal_agent.py             # Technical + fundamental signal detection
+â”‚   â”œâ”€â”€ reasoning_agent.py          # LLM explanation generation
+â”‚   â”œâ”€â”€ backtesting_agent.py        # Historical signal validation
+â”‚   â”œâ”€â”€ decision_agent.py           # Final decision + trade parameters
+â”‚   â””â”€â”€ audit_agent.py             # Decision logging & outcome tracking
+â”‚
+â”œâ”€â”€ models/
+â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”œâ”€â”€ db/
+â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚   â”œâ”€â”€ base.py                 # SQLAlchemy Base
+â”‚   â”‚   â”œâ”€â”€ stock.py                # Stock ORM model
+â”‚   â”‚   â”œâ”€â”€ scan_run.py             # ScanRun ORM model
+â”‚   â”‚   â”œâ”€â”€ scan_result.py          # ScanResult ORM model
+â”‚   â”‚   â”œâ”€â”€ decision.py             # Decision ORM model
+â”‚   â”‚   â”œâ”€â”€ bulk_deal.py            # BulkDeal ORM model
+â”‚   â”‚   â”œâ”€â”€ watchlist_item.py       # WatchlistItem ORM model
+â”‚   â”‚   â”œâ”€â”€ alert.py                # Alert ORM model
+â”‚   â”‚   â”œâ”€â”€ market_data_cache.py    # MarketDataCache ORM model
+â”‚   â”‚   â””â”€â”€ system_setting.py      # SystemSetting ORM model
+â”‚   â”‚
+â”‚   â””â”€â”€ schemas/
+â”‚       â”œâ”€â”€ __init__.py
+â”‚       â”œâ”€â”€ scan.py                 # Pydantic schemas for scan endpoints
+â”‚       â”œâ”€â”€ opportunity.py          # Pydantic schemas for opportunity data
+â”‚       â”œâ”€â”€ stock.py                # Pydantic schemas for stock detail
+â”‚       â”œâ”€â”€ decision.py             # Pydantic schemas for decisions
+â”‚       â”œâ”€â”€ watchlist.py            # Pydantic schemas for watchlist
+â”‚       â”œâ”€â”€ alert.py                # Pydantic schemas for alerts
+â”‚       â””â”€â”€ common.py              # Shared schemas (APIResponse, Meta, etc.)
+â”‚
+â”œâ”€â”€ services/
+â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”œâ”€â”€ scan_service.py             # Business logic layer for scan operations
+â”‚   â”œâ”€â”€ stock_service.py            # Business logic for stock detail
+â”‚   â”œâ”€â”€ history_service.py          # Business logic for decision history
+â”‚   â”œâ”€â”€ watchlist_service.py        # Business logic for watchlist
+â”‚   â””â”€â”€ alert_service.py           # Business logic for alerts
+â”‚
+â”œâ”€â”€ data_sources/
+â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”œâ”€â”€ yfinance_client.py          # yfinance wrapper with error handling
+â”‚   â”œâ”€â”€ nse_client.py               # NSE bulk deals + corporate data
+â”‚   â””â”€â”€ cache_client.py            # Redis cache wrapper
+â”‚
+â”œâ”€â”€ core/
+â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”œâ”€â”€ database.py                 # DB session factory
+â”‚   â”œâ”€â”€ redis.py                    # Redis client singleton
+â”‚   â”œâ”€â”€ celery_app.py               # Celery app instance
+â”‚   â”œâ”€â”€ logger.py                   # Structured logging setup
+â”‚   â””â”€â”€ exceptions.py              # Custom exception classes
+â”‚
+â”œâ”€â”€ tasks/
+â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”œâ”€â”€ scan_task.py                # Celery task: run full scan
+â”‚   â””â”€â”€ outcome_task.py            # Celery task: measure T+5 outcomes
+â”‚
+â””â”€â”€ tests/
+    â”œâ”€â”€ __init__.py
+    â”œâ”€â”€ conftest.py                 # Test fixtures
+    â”œâ”€â”€ unit/
+    â”‚   â”œâ”€â”€ test_signal_agent.py
+    â”‚   â”œâ”€â”€ test_backtesting_agent.py
+    â”‚   â”œâ”€â”€ test_decision_agent.py
+    â”‚   â””â”€â”€ test_reasoning_agent.py
+    â””â”€â”€ integration/
+        â”œâ”€â”€ test_scan_api.py
+        â”œâ”€â”€ test_stock_api.py
+        â””â”€â”€ test_history_api.py
 ```
 
 ---
 
-## 4. Frontend Structure — `apps/frontend/`
+## 4. Frontend Structure â€” `apps/frontend/`
 
 ```
 apps/frontend/
-├── index.html
-├── package.json
-├── tsconfig.json
-├── vite.config.ts
-├── tailwind.config.js
-├── Dockerfile
-│
-├── public/
-│   └── favicon.ico
-│
-├── src/
-│   ├── main.tsx                    # React entry point
-│   ├── App.tsx                     # Root component + routing
-│   │
-│   ├── pages/
-│   │   ├── Dashboard.tsx           # Home / market pulse
-│   │   ├── Scanner.tsx             # Scan trigger + opportunity list
-│   │   ├── StockDetail.tsx         # Full stock analysis page
-│   │   ├── History.tsx             # Past decisions log
-│   │   ├── Watchlist.tsx           # User watchlist
-│   │   ├── Alerts.tsx              # Notification center
-│   │   └── Settings.tsx           # User preferences
-│   │
-│   ├── components/
-│   │   ├── layout/
-│   │   │   ├── Sidebar.tsx
-│   │   │   ├── TopBar.tsx
-│   │   │   └── PageWrapper.tsx
-│   │   │
-│   │   ├── scanner/
-│   │   │   ├── OpportunityCard.tsx  # Card for each opportunity
-│   │   │   ├── ScanButton.tsx       # Trigger + loading state
-│   │   │   ├── FilterBar.tsx        # Action + signal filters
-│   │   │   └── ScanStats.tsx        # Stocks scanned, signals found
-│   │   │
-│   │   ├── stock/
-│   │   │   ├── StockTabs.tsx        # Tab container
-│   │   │   ├── OverviewTab.tsx
-│   │   │   ├── SignalsTab.tsx
-│   │   │   ├── BacktestTab.tsx
-│   │   │   ├── TradePlanTab.tsx
-│   │   │   ├── ChartTab.tsx
-│   │   │   ├── SignalCard.tsx        # Individual signal display
-│   │   │   ├── ReasoningBox.tsx     # LLM explanation display
-│   │   │   └── DecisionCard.tsx     # BUY/WATCH/AVOID card
-│   │   │
-│   │   ├── history/
-│   │   │   ├── DecisionTable.tsx
-│   │   │   ├── DecisionRow.tsx
-│   │   │   ├── DecisionDetail.tsx   # Full replay modal
-│   │   │   ├── TrackRecordStats.tsx # Win rate summary
-│   │   │   └── ExportButton.tsx
-│   │   │
-│   │   ├── charts/
-│   │   │   ├── PriceChart.tsx       # Candlestick / line chart
-│   │   │   ├── VolumeChart.tsx
-│   │   │   ├── BacktestChart.tsx    # Past signal markers
-│   │   │   └── ConfidenceGauge.tsx  # Visual confidence meter
-│   │   │
-│   │   └── common/
-│   │       ├── ActionBadge.tsx      # BUY/WATCH/AVOID badge
-│   │       ├── ConfidencePill.tsx   # % pill
-│   │       ├── LoadingSpinner.tsx
-│   │       ├── EmptyState.tsx
-│   │       ├── ErrorState.tsx
-│   │       └── Tooltip.tsx
-│   │
-│   ├── hooks/
-│   │   ├── useScan.ts               # Scan trigger + polling
-│   │   ├── useOpportunities.ts      # Fetch + filter opportunities
-│   │   ├── useStockDetail.ts        # Stock analysis data
-│   │   ├── useHistory.ts            # Decision history
-│   │   ├── useWatchlist.ts          # Watchlist CRUD
-│   │   └── useAlerts.ts            # Alerts + unread count
-│   │
-│   ├── store/
-│   │   ├── scanStore.ts             # Zustand: scan state
-│   │   ├── filterStore.ts           # Zustand: active filters
-│   │   └── settingsStore.ts        # Zustand: user preferences
-│   │
-│   ├── api/
-│   │   ├── client.ts               # Axios instance + interceptors
-│   │   ├── scan.api.ts
-│   │   ├── opportunities.api.ts
-│   │   ├── stock.api.ts
-│   │   ├── history.api.ts
-│   │   ├── watchlist.api.ts
-│   │   ├── alerts.api.ts
-│   │   └── settings.api.ts
-│   │
-│   ├── types/
-│   │   ├── opportunity.ts
-│   │   ├── stock.ts
-│   │   ├── decision.ts
-│   │   ├── signal.ts
-│   │   └── common.ts
-│   │
-│   └── utils/
-│       ├── formatters.ts            # Currency, %, date formatters
-│       ├── colors.ts                # Action → color mappings
-│       └── constants.ts            # App-wide constants
-│
-└── tests/
-    └── components/
-        ├── OpportunityCard.test.tsx
-        └── DecisionCard.test.tsx
+â”œâ”€â”€ index.html
+â”œâ”€â”€ package.json
+â”œâ”€â”€ tsconfig.json
+â”œâ”€â”€ vite.config.ts
+â”œâ”€â”€ tailwind.config.js
+â”œâ”€â”€ Dockerfile
+â”‚
+â”œâ”€â”€ public/
+â”‚   â””â”€â”€ favicon.ico
+â”‚
+â”œâ”€â”€ src/
+â”‚   â”œâ”€â”€ main.tsx                    # React entry point
+â”‚   â”œâ”€â”€ App.tsx                     # Root component + routing
+â”‚   â”‚
+â”‚   â”œâ”€â”€ pages/
+â”‚   â”‚   â”œâ”€â”€ Dashboard.tsx           # Home / market pulse
+â”‚   â”‚   â”œâ”€â”€ Scanner.tsx             # Scan trigger + opportunity list
+â”‚   â”‚   â”œâ”€â”€ StockDetail.tsx         # Full stock analysis page
+â”‚   â”‚   â”œâ”€â”€ History.tsx             # Past decisions log
+â”‚   â”‚   â”œâ”€â”€ Watchlist.tsx           # User watchlist
+â”‚   â”‚   â”œâ”€â”€ Alerts.tsx              # Notification center
+â”‚   â”‚   â””â”€â”€ Settings.tsx           # User preferences
+â”‚   â”‚
+â”‚   â”œâ”€â”€ components/
+â”‚   â”‚   â”œâ”€â”€ layout/
+â”‚   â”‚   â”‚   â”œâ”€â”€ Sidebar.tsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ TopBar.tsx
+â”‚   â”‚   â”‚   â””â”€â”€ PageWrapper.tsx
+â”‚   â”‚   â”‚
+â”‚   â”‚   â”œâ”€â”€ scanner/
+â”‚   â”‚   â”‚   â”œâ”€â”€ OpportunityCard.tsx  # Card for each opportunity
+â”‚   â”‚   â”‚   â”œâ”€â”€ ScanButton.tsx       # Trigger + loading state
+â”‚   â”‚   â”‚   â”œâ”€â”€ FilterBar.tsx        # Action + signal filters
+â”‚   â”‚   â”‚   â””â”€â”€ ScanStats.tsx        # Stocks scanned, signals found
+â”‚   â”‚   â”‚
+â”‚   â”‚   â”œâ”€â”€ stock/
+â”‚   â”‚   â”‚   â”œâ”€â”€ StockTabs.tsx        # Tab container
+â”‚   â”‚   â”‚   â”œâ”€â”€ OverviewTab.tsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ SignalsTab.tsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ BacktestTab.tsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ TradePlanTab.tsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ ChartTab.tsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ SignalCard.tsx        # Individual signal display
+â”‚   â”‚   â”‚   â”œâ”€â”€ ReasoningBox.tsx     # LLM explanation display
+â”‚   â”‚   â”‚   â””â”€â”€ DecisionCard.tsx     # BUY/WATCH/AVOID card
+â”‚   â”‚   â”‚
+â”‚   â”‚   â”œâ”€â”€ history/
+â”‚   â”‚   â”‚   â”œâ”€â”€ DecisionTable.tsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ DecisionRow.tsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ DecisionDetail.tsx   # Full replay modal
+â”‚   â”‚   â”‚   â”œâ”€â”€ TrackRecordStats.tsx # Win rate summary
+â”‚   â”‚   â”‚   â””â”€â”€ ExportButton.tsx
+â”‚   â”‚   â”‚
+â”‚   â”‚   â”œâ”€â”€ charts/
+â”‚   â”‚   â”‚   â”œâ”€â”€ PriceChart.tsx       # Candlestick / line chart
+â”‚   â”‚   â”‚   â”œâ”€â”€ VolumeChart.tsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ BacktestChart.tsx    # Past signal markers
+â”‚   â”‚   â”‚   â””â”€â”€ ConfidenceGauge.tsx  # Visual confidence meter
+â”‚   â”‚   â”‚
+â”‚   â”‚   â””â”€â”€ common/
+â”‚   â”‚       â”œâ”€â”€ ActionBadge.tsx      # BUY/WATCH/AVOID badge
+â”‚   â”‚       â”œâ”€â”€ ConfidencePill.tsx   # % pill
+â”‚   â”‚       â”œâ”€â”€ LoadingSpinner.tsx
+â”‚   â”‚       â”œâ”€â”€ EmptyState.tsx
+â”‚   â”‚       â”œâ”€â”€ ErrorState.tsx
+â”‚   â”‚       â””â”€â”€ Tooltip.tsx
+â”‚   â”‚
+â”‚   â”œâ”€â”€ hooks/
+â”‚   â”‚   â”œâ”€â”€ useScan.ts               # Scan trigger + polling
+â”‚   â”‚   â”œâ”€â”€ useOpportunities.ts      # Fetch + filter opportunities
+â”‚   â”‚   â”œâ”€â”€ useStockDetail.ts        # Stock analysis data
+â”‚   â”‚   â”œâ”€â”€ useHistory.ts            # Decision history
+â”‚   â”‚   â”œâ”€â”€ useWatchlist.ts          # Watchlist CRUD
+â”‚   â”‚   â””â”€â”€ useAlerts.ts            # Alerts + unread count
+â”‚   â”‚
+â”‚   â”œâ”€â”€ store/
+â”‚   â”‚   â”œâ”€â”€ scanStore.ts             # Zustand: scan state
+â”‚   â”‚   â”œâ”€â”€ filterStore.ts           # Zustand: active filters
+â”‚   â”‚   â””â”€â”€ settingsStore.ts        # Zustand: user preferences
+â”‚   â”‚
+â”‚   â”œâ”€â”€ api/
+â”‚   â”‚   â”œâ”€â”€ client.ts               # Axios instance + interceptors
+â”‚   â”‚   â”œâ”€â”€ scan.api.ts
+â”‚   â”‚   â”œâ”€â”€ opportunities.api.ts
+â”‚   â”‚   â”œâ”€â”€ stock.api.ts
+â”‚   â”‚   â”œâ”€â”€ history.api.ts
+â”‚   â”‚   â”œâ”€â”€ watchlist.api.ts
+â”‚   â”‚   â”œâ”€â”€ alerts.api.ts
+â”‚   â”‚   â””â”€â”€ settings.api.ts
+â”‚   â”‚
+â”‚   â”œâ”€â”€ types/
+â”‚   â”‚   â”œâ”€â”€ opportunity.ts
+â”‚   â”‚   â”œâ”€â”€ stock.ts
+â”‚   â”‚   â”œâ”€â”€ decision.ts
+â”‚   â”‚   â”œâ”€â”€ signal.ts
+â”‚   â”‚   â””â”€â”€ common.ts
+â”‚   â”‚
+â”‚   â””â”€â”€ utils/
+â”‚       â”œâ”€â”€ formatters.ts            # Currency, %, date formatters
+â”‚       â”œâ”€â”€ colors.ts                # Action â†’ color mappings
+â”‚       â””â”€â”€ constants.ts            # App-wide constants
+â”‚
+â””â”€â”€ tests/
+    â””â”€â”€ components/
+        â”œâ”€â”€ OpportunityCard.test.tsx
+        â””â”€â”€ DecisionCard.test.tsx
 ```
 
 ---
@@ -279,7 +279,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://alphahunter:password@db:5432/alphahunter
       - REDIS_URL=redis://redis:6379/0
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     depends_on:
       - db
       - redis
@@ -290,7 +290,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://alphahunter:password@db:5432/alphahunter
       - REDIS_URL=redis://redis:6379/0
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     depends_on:
       - db
       - redis
@@ -300,7 +300,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - VITE_API_BASE_URL=http://localhost:8000/api
+      - VITE_API_BASE_URL=/api
 
   db:
     image: postgres:15-alpine
@@ -327,8 +327,8 @@ volumes:
 ### `.env.example`
 
 ```
-# Anthropic
-ANTHROPIC_API_KEY=your_anthropic_api_key_here
+# Gemini
+GEMINI_API_KEY=your_gemini_api_key_here
 
 # Database
 DATABASE_URL=postgresql://alphahunter:password@localhost:5432/alphahunter

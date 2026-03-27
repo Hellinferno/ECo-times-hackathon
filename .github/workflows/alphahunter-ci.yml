@@ -1,0 +1,66 @@
+name: AlphaHunter CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "alphahunter/**"
+      - "README.md"
+      - "files/**"
+      - ".github/workflows/alphahunter-ci.yml"
+  pull_request:
+    paths:
+      - "alphahunter/**"
+      - "README.md"
+      - "files/**"
+      - ".github/workflows/alphahunter-ci.yml"
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: alphahunter/apps/backend
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run backend tests
+        run: pytest -q
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: alphahunter/apps/frontend
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: alphahunter/apps/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend
+        env:
+          VITE_API_BASE_URL: https://backend.example.com/api
+        run: npm run build

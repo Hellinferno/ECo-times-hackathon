@@ -1,6 +1,6 @@
-# 09 — Engineering Scope Definition
+# 09 â€” Engineering Scope Definition
 
-## AlphaHunter AI — Opportunity & Decision Engine
+## AlphaHunter AI â€” Opportunity & Decision Engine
 
 ---
 
@@ -14,11 +14,11 @@ This document defines the boundaries of what will and will not be built for Alph
 
 > **Build less, but make what you build work perfectly.**
 
-The goal is a system where every feature that exists is polished, functional, and impressive — not a system with 30 half-finished features.
+The goal is a system where every feature that exists is polished, functional, and impressive â€” not a system with 30 half-finished features.
 
 ---
 
-## 3. IN Scope — MVP (Hackathon Build)
+## 3. IN Scope â€” MVP (Hackathon Build)
 
 These are non-negotiable for a competitive demo.
 
@@ -69,7 +69,7 @@ These are non-negotiable for a competitive demo.
 
 ---
 
-## 4. OUT of Scope — MVP
+## 4. OUT of Scope â€” MVP
 
 These will NOT be built for the hackathon. Any time spent on these is wasted.
 
@@ -120,8 +120,8 @@ These constraints define the engineering boundaries.
 | Constraint | Specification |
 |------------|--------------|
 | Data provider | yfinance (free tier) + NSE public endpoints only |
-| LLM provider | Anthropic Claude API only |
-| Stock universe | NSE-listed equities, top 100–200 by volume |
+| LLM provider | Gemini API only |
+| Stock universe | NSE-listed equities, top 100â€“200 by volume |
 | Historical data | Max 2 years (yfinance free limit) |
 | Backtest window | Last 5 matching occurrences |
 | Scan interval | Every 15 minutes during market hours |
@@ -139,9 +139,9 @@ These constraints define the engineering boundaries.
 | Standard | Requirement |
 |----------|------------|
 | Reasoning quality | Every LLM explanation must reference actual data values. No generic phrases. |
-| Backtest integrity | Historical matches must be real — no synthetic or fake data. |
+| Backtest integrity | Historical matches must be real â€” no synthetic or fake data. |
 | Decision auditability | Every decision stored with full snapshot. No black-box outputs. |
-| Signal accuracy | Each signal must meet exact threshold — no approximations. |
+| Signal accuracy | Each signal must meet exact threshold â€” no approximations. |
 | API reliability | All API errors return structured error responses. No unhandled exceptions in prod. |
 
 ### 7.2 Acceptable Shortcuts (MVP Only)

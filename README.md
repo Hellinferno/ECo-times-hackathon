@@ -14,7 +14,7 @@ Detect → Explain → Validate → Decide → Audit
 
 1. **Market Scanner** — Monitors NSE stocks every 15 minutes during market hours
 2. **Signal Detection** — 3 algorithms: Breakout, Volume Spike, Bulk Deal detection
-3. **AI Reasoning** — Claude AI generates data-grounded explanations referencing actual values
+3. **AI Reasoning** — Gemini generates data-grounded explanations referencing actual values
 4. **Backtesting** — Historical pattern matching with T+5 outcome measurement
 5. **Decision Engine** — Outputs BUY/WATCH/AVOID with 0-100 confidence score, entry, target, stop-loss
 
@@ -24,10 +24,10 @@ Detect → Explain → Validate → Decide → Audit
 
 | Layer | Technology |
 |-------|-----------|
-| **Backend** | Python 3.11, FastAPI, SQLAlchemy, Celery |
+| **Backend** | Python 3.11, FastAPI, SQLAlchemy, APScheduler |
 | **Frontend** | React 19, TypeScript, Tailwind CSS 4, Recharts |
 | **Database** | PostgreSQL 15, Redis 7 |
-| **AI/LLM** | Anthropic Claude API |
+| **AI/LLM** | Gemini API (`google-genai`) |
 | **Data** | yfinance, NSE bulk deals API |
 | **Infra** | Docker Compose, Alembic migrations |
 
@@ -107,7 +107,7 @@ cd apps/backend
 python -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-cp ../../.env.example ../../.env # Edit .env with your API keys
+cp ../../.env.example ../../.env # Edit .env with your Gemini and data-provider keys
 python -c "from database import engine; from models.db import Base; Base.metadata.create_all(bind=engine)"
 python ../../scripts/seed_stocks.py
 uvicorn main:app --reload --port 8000
@@ -119,6 +119,26 @@ npm run dev
 ```
 
 Open http://localhost:5173 and click **Trigger Market Scan** to start.
+
+---
+
+## Deployment
+
+**Recommended split deployment**
+
+- **Frontend (Vercel)** Root Directory: `alphahunter/apps/frontend`
+- **Backend (Railway)** Root Directory: `alphahunter/apps/backend`
+
+### Vercel
+
+- The frontend includes `alphahunter/apps/frontend/vercel.json` so React Router paths rewrite to `index.html` instead of returning `404`.
+- Set `VITE_API_BASE_URL=https://<your-railway-backend>/api` in the Vercel project environment variables.
+
+### Railway
+
+- Set `GEMINI_API_KEY` and optionally `GEMINI_MODEL=gemini-2.5-flash`.
+- Set `ALLOWED_ORIGINS=https://<your-vercel-domain>,https://*.vercel.app`.
+- Keep the backend service at a single replica for now because APScheduler runs in-process.
 
 ---
 

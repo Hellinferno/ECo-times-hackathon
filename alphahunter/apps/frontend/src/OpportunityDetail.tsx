@@ -1,19 +1,29 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Target, ShieldAlert, Binary, MessageSquare, Zap } from 'lucide-react';
+import { api } from './api/client';
+import type { OpportunityDetail as OpportunityDetailResponse } from './api/client';
 
 function OpportunityDetail() {
   const { id } = useParams();
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<OpportunityDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch(`http://localhost:8000/api/opportunities/${id}`)
-      .then(res => res.json())
-      .then(json => {
-        if (json.success) setData(json.data);
-      })
-      .catch(console.error)
+    if (!id) {
+      setError("Opportunity not found.");
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    api
+      .getOpportunityDetail(id)
+      .then((res) => setData(res.data))
+      .catch((err: Error) => setError(err.message || "Failed to load opportunity."))
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -23,6 +33,10 @@ function OpportunityDetail() {
         <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
+  }
+
+  if (error) {
+    return <div className="text-center py-20 text-red-400">{error}</div>;
   }
 
   if (!data) {

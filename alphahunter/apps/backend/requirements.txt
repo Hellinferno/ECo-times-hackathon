@@ -9,7 +9,7 @@ APScheduler
 pydantic
 pydantic-settings
 redis
-anthropic
+google-genai
 tenacity
 celery[redis]
 python-dotenv

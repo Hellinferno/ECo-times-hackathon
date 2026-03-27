@@ -1,127 +1,127 @@
 # Architecture Diagram
 
-## AlphaHunter AI — System Architecture Overview
+## AlphaHunter AI â€” System Architecture Overview
 
 ---
 
 ## 1. Full System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         ALPHAHUNTER AI SYSTEM                           │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                         FRONTEND (React)                         │   │
-│  │  Dashboard │ Scanner │ Stock Detail │ History │ Watchlist        │   │
-│  └────────────────────────────┬────────────────────────────────────┘   │
-│                               │ HTTP REST API                           │
-│  ┌────────────────────────────▼────────────────────────────────────┐   │
-│  │                      FASTAPI BACKEND                             │   │
-│  │  /scan  /opportunities  /stock  /history  /watchlist  /alerts   │   │
-│  └────────────────────────────┬────────────────────────────────────┘   │
-│                               │                                         │
-│        ┌──────────────────────┼──────────────────────┐                 │
-│        │                      │                      │                 │
-│        ▼                      ▼                      ▼                 │
-│  ┌──────────┐         ┌───────────────┐      ┌─────────────┐          │
-│  │  CELERY  │         │   AGENT       │      │  POSTGRESQL │          │
-│  │  WORKER  │────────▶│   PIPELINE    │      │  DATABASE   │          │
-│  └──────────┘         └───────┬───────┘      └─────────────┘          │
-│       ▲                       │                                         │
-│       │                       │                                         │
-│  ┌────────┐      ┌────────────▼─────────────────────────────────┐      │
-│  │ REDIS  │      │              AGENT PIPELINE                   │      │
-│  │ QUEUE  │      │                                               │      │
-│  │ CACHE  │      │  1. Scheduler Agent  →  triggers scan         │      │
-│  └────────┘      │  2. Data Agent       →  fetch market data     │      │
-│                  │  3. Signal Agent     →  detect signals        │      │
-│                  │  4. Reasoning Agent  →  LLM explanation       │      │
-│                  │  5. Backtest Agent   →  validate history      │      │
-│                  │  6. Decision Agent   →  BUY/WATCH/AVOID       │      │
-│                  │  7. Audit Agent      →  log + track outcome   │      │
-│                  └──────────────────────────────────────────────┘      │
-│                                       │                                 │
-│        ┌──────────────────────────────┼───────────────────────┐        │
-│        │                              │                       │        │
-│        ▼                              ▼                       ▼        │
-│  ┌──────────────┐           ┌──────────────────┐    ┌──────────────┐  │
-│  │   YFINANCE   │           │   NSE PUBLIC     │    │  ANTHROPIC   │  │
-│  │   PRICE DATA │           │   BULK DEALS     │    │  CLAUDE API  │  │
-│  │   (Live +    │           │   FEED           │    │  (LLM)       │  │
-│  │   Historical)│           │                  │    │              │  │
-│  └──────────────┘           └──────────────────┘    └──────────────┘  │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚                         ALPHAHUNTER AI SYSTEM                           â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚                                                                         â”‚
+â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”   â”‚
+â”‚  â”‚                         FRONTEND (React)                         â”‚   â”‚
+â”‚  â”‚  Dashboard â”‚ Scanner â”‚ Stock Detail â”‚ History â”‚ Watchlist        â”‚   â”‚
+â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜   â”‚
+â”‚                               â”‚ HTTP REST API                           â”‚
+â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â–¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”   â”‚
+â”‚  â”‚                      FASTAPI BACKEND                             â”‚   â”‚
+â”‚  â”‚  /scan  /opportunities  /stock  /history  /watchlist  /alerts   â”‚   â”‚
+â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜   â”‚
+â”‚                               â”‚                                         â”‚
+â”‚        â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”                 â”‚
+â”‚        â”‚                      â”‚                      â”‚                 â”‚
+â”‚        â–¼                      â–¼                      â–¼                 â”‚
+â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”         â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”      â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”          â”‚
+â”‚  â”‚  CELERY  â”‚         â”‚   AGENT       â”‚      â”‚  POSTGRESQL â”‚          â”‚
+â”‚  â”‚  WORKER  â”‚â”€â”€â”€â”€â”€â”€â”€â”€â–¶â”‚   PIPELINE    â”‚      â”‚  DATABASE   â”‚          â”‚
+â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜         â””â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”˜      â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜          â”‚
+â”‚       â–²                       â”‚                                         â”‚
+â”‚       â”‚                       â”‚                                         â”‚
+â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”      â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â–¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”      â”‚
+â”‚  â”‚ REDIS  â”‚      â”‚              AGENT PIPELINE                   â”‚      â”‚
+â”‚  â”‚ QUEUE  â”‚      â”‚                                               â”‚      â”‚
+â”‚  â”‚ CACHE  â”‚      â”‚  1. Scheduler Agent  â†’  triggers scan         â”‚      â”‚
+â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”˜      â”‚  2. Data Agent       â†’  fetch market data     â”‚      â”‚
+â”‚                  â”‚  3. Signal Agent     â†’  detect signals        â”‚      â”‚
+â”‚                  â”‚  4. Reasoning Agent  â†’  LLM explanation       â”‚      â”‚
+â”‚                  â”‚  5. Backtest Agent   â†’  validate history      â”‚      â”‚
+â”‚                  â”‚  6. Decision Agent   â†’  BUY/WATCH/AVOID       â”‚      â”‚
+â”‚                  â”‚  7. Audit Agent      â†’  log + track outcome   â”‚      â”‚
+â”‚                  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜      â”‚
+â”‚                                       â”‚                                 â”‚
+â”‚        â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”        â”‚
+â”‚        â”‚                              â”‚                       â”‚        â”‚
+â”‚        â–¼                              â–¼                       â–¼        â”‚
+â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”           â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”    â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”‚
+â”‚  â”‚   YFINANCE   â”‚           â”‚   NSE PUBLIC     â”‚    â”‚  ANTHROPIC   â”‚  â”‚
+â”‚  â”‚   PRICE DATA â”‚           â”‚   BULK DEALS     â”‚    â”‚  CLAUDE API  â”‚  â”‚
+â”‚  â”‚   (Live +    â”‚           â”‚   FEED           â”‚    â”‚  (LLM)       â”‚  â”‚
+â”‚  â”‚   Historical)â”‚           â”‚                  â”‚    â”‚              â”‚  â”‚
+â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜           â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜    â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚
+â”‚                                                                         â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 ```
 
 ---
 
-## 2. Agent Pipeline — Detailed Flow
+## 2. Agent Pipeline â€” Detailed Flow
 
 ```
 SCHEDULER AGENT
-│
-│  Every 15 min during market hours (9:15 AM – 3:30 PM IST)
-│  Queues 100+ NSE stocks for processing
-│
-└──▶ [Queue: stock_scan_tasks]
-         │
-         │ (Celery workers pick up tasks in parallel, max 10 concurrent)
-         │
-         ▼
+â”‚
+â”‚  Every 15 min during market hours (9:15 AM â€“ 3:30 PM IST)
+â”‚  Queues 100+ NSE stocks for processing
+â”‚
+â””â”€â”€â–¶ [Queue: stock_scan_tasks]
+         â”‚
+         â”‚ (Celery workers pick up tasks in parallel, max 10 concurrent)
+         â”‚
+         â–¼
     DATA AGENT (per stock)
-    │
-    ├── Fetches: live price, volume
-    ├── Fetches: 20-day OHLCV (from cache or yfinance)
-    ├── Fetches: 2-year OHLCV (from cache or yfinance)
-    ├── Fetches: NSE bulk deals last 5 days
-    └── Returns: MarketData object
-         │
-         ▼
+    â”‚
+    â”œâ”€â”€ Fetches: live price, volume
+    â”œâ”€â”€ Fetches: 20-day OHLCV (from cache or yfinance)
+    â”œâ”€â”€ Fetches: 2-year OHLCV (from cache or yfinance)
+    â”œâ”€â”€ Fetches: NSE bulk deals last 5 days
+    â””â”€â”€ Returns: MarketData object
+         â”‚
+         â–¼
     SIGNAL AGENT (per stock)
-    │
-    ├── Breakout: current_price > max(close, 30d)?
-    ├── Volume Spike: today_vol > 2.0 × avg_vol(20d)?
-    ├── Bulk Deal: institutional buy in last 5 days?
-    ├── Composite Score: weighted combination
-    │
-    ├── [IF no signals triggered]
-    │       └── SKIP remaining pipeline → log "no opportunity"
-    │
-    └── [IF at least 1 signal triggered]
-         │
-         ▼
+    â”‚
+    â”œâ”€â”€ Breakout: current_price > max(close, 30d)?
+    â”œâ”€â”€ Volume Spike: today_vol > 2.0 Ã— avg_vol(20d)?
+    â”œâ”€â”€ Bulk Deal: institutional buy in last 5 days?
+    â”œâ”€â”€ Composite Score: weighted combination
+    â”‚
+    â”œâ”€â”€ [IF no signals triggered]
+    â”‚       â””â”€â”€ SKIP remaining pipeline â†’ log "no opportunity"
+    â”‚
+    â””â”€â”€ [IF at least 1 signal triggered]
+         â”‚
+         â–¼
     REASONING AGENT (LLM call)
-    │
-    ├── Builds data-grounded prompt with signal values
-    ├── Calls Claude API (claude-sonnet-4-20250514)
-    ├── Validates: response contains actual data values
-    └── Returns: 3–5 sentence explanation
-         │
-         ▼
+    â”‚
+    â”œâ”€â”€ Builds data-grounded prompt with signal values
+    â”œâ”€â”€ Calls Gemini API (gemini-2.5-flash)
+    â”œâ”€â”€ Validates: response contains actual data values
+    â””â”€â”€ Returns: 3â€“5 sentence explanation
+         â”‚
+         â–¼
     BACKTESTING AGENT
-    │
-    ├── Searches 2yr historical data for same signal pattern
-    ├── Measures T+5 return for each match
-    ├── Calculates: success rate, avg return, worst/best case
-    └── Returns: BacktestResult (up to 5 historical cases)
-         │
-         ▼
+    â”‚
+    â”œâ”€â”€ Searches 2yr historical data for same signal pattern
+    â”œâ”€â”€ Measures T+5 return for each match
+    â”œâ”€â”€ Calculates: success rate, avg return, worst/best case
+    â””â”€â”€ Returns: BacktestResult (up to 5 historical cases)
+         â”‚
+         â–¼
     DECISION AGENT
-    │
-    ├── Confidence = f(signal strength, backtest quality, signal count)
-    ├── Action: BUY (≥70%) / WATCH (50–69%) / AVOID (<50%)
-    ├── Trade params: entry, target, stop-loss, R:R ratio
-    └── Returns: Decision object
-         │
-         ▼
+    â”‚
+    â”œâ”€â”€ Confidence = f(signal strength, backtest quality, signal count)
+    â”œâ”€â”€ Action: BUY (â‰¥70%) / WATCH (50â€“69%) / AVOID (<50%)
+    â”œâ”€â”€ Trade params: entry, target, stop-loss, R:R ratio
+    â””â”€â”€ Returns: Decision object
+         â”‚
+         â–¼
     AUDIT AGENT
-    │
-    ├── Persists Decision to PostgreSQL with full snapshot
-    ├── Schedules T+5 outcome measurement job
-    ├── Triggers alert if confidence ≥ threshold
-    └── Decision available via API
+    â”‚
+    â”œâ”€â”€ Persists Decision to PostgreSQL with full snapshot
+    â”œâ”€â”€ Schedules T+5 outcome measurement job
+    â”œâ”€â”€ Triggers alert if confidence â‰¥ threshold
+    â””â”€â”€ Decision available via API
 ```
 
 ---
@@ -130,49 +130,49 @@ SCHEDULER AGENT
 
 ```
 EXTERNAL DATA SOURCES
-        │
-        │  Real-time price + volume (yfinance)
-        │  Historical OHLCV 2yr (yfinance)
-        │  Bulk deal data (NSE public CSV)
-        │
-        ▼
+        â”‚
+        â”‚  Real-time price + volume (yfinance)
+        â”‚  Historical OHLCV 2yr (yfinance)
+        â”‚  Bulk deal data (NSE public CSV)
+        â”‚
+        â–¼
 REDIS CACHE
-   ├── Live data: TTL 5 min
-   ├── 20d historical: TTL 15 min
-   ├── 2yr historical: TTL 24h
-   └── Bulk deals: TTL 6h
-        │
-        ▼ (cache miss → fetch from source)
+   â”œâ”€â”€ Live data: TTL 5 min
+   â”œâ”€â”€ 20d historical: TTL 15 min
+   â”œâ”€â”€ 2yr historical: TTL 24h
+   â””â”€â”€ Bulk deals: TTL 6h
+        â”‚
+        â–¼ (cache miss â†’ fetch from source)
 DATA AGENT
-        │
-        ▼
+        â”‚
+        â–¼
 SIGNAL COMPUTATION
-   ├── Breakout detection
-   ├── Volume spike detection
-   └── Bulk deal detection
-        │
-        ▼
+   â”œâ”€â”€ Breakout detection
+   â”œâ”€â”€ Volume spike detection
+   â””â”€â”€ Bulk deal detection
+        â”‚
+        â–¼
 LLM REASONING
-   └── Anthropic Claude API call
-        │
-        ▼
+   â””â”€â”€ Gemini API call
+        â”‚
+        â–¼
 BACKTEST ENGINE
-   └── Scan 2yr historical data
-        │
-        ▼
+   â””â”€â”€ Scan 2yr historical data
+        â”‚
+        â–¼
 DECISION ENGINE
-   └── Score + action + trade params
-        │
-        ▼
+   â””â”€â”€ Score + action + trade params
+        â”‚
+        â–¼
 POSTGRESQL DATABASE
-   ├── decisions table
-   ├── scan_results table
-   └── audit_logs table
-        │
-        ▼
+   â”œâ”€â”€ decisions table
+   â”œâ”€â”€ scan_results table
+   â””â”€â”€ audit_logs table
+        â”‚
+        â–¼
 FASTAPI REST API
-        │
-        ▼
+        â”‚
+        â–¼
 REACT FRONTEND
 ```
 
@@ -182,49 +182,49 @@ REACT FRONTEND
 
 ```
 App.tsx (React Router)
-│
-├── / → Dashboard.tsx
-│         ├── MarketPulseSummary
-│         ├── TopOpportunitiesPreview
-│         └── WatchlistQuickView
-│
-├── /scanner → Scanner.tsx
-│         ├── ScanControls (ScanButton + Stats)
-│         ├── FilterBar
-│         └── OpportunityList
-│               └── OpportunityCard × N
-│
-├── /stock/:symbol → StockDetail.tsx
-│         └── StockTabs
-│               ├── OverviewTab
-│               │     ├── PriceHeader
-│               │     ├── ReasoningBox (LLM text)
-│               │     └── DecisionCard (BUY/WATCH/AVOID)
-│               ├── SignalsTab
-│               │     ├── BreakoutSignalCard
-│               │     ├── VolumeSpikeCard
-│               │     └── BulkDealCard
-│               ├── BacktestTab
-│               │     ├── BacktestStats
-│               │     └── HistoricalCasesTable
-│               ├── TradePlanTab
-│               │     ├── EntryTargetStopLoss
-│               │     └── ConfidenceBreakdown
-│               └── ChartTab
-│                     ├── PriceChart
-│                     ├── VolumeChart
-│                     └── SignalMarkers
-│
-├── /history → History.tsx
-│         ├── TrackRecordStats (win rate, total decisions)
-│         ├── FilterBar (date, outcome, symbol)
-│         └── DecisionTable → DecisionDetail (modal)
-│
-├── /watchlist → Watchlist.tsx
-│         └── WatchlistCard × N
-│
-└── /alerts → Alerts.tsx
-          └── AlertItem × N
+â”‚
+â”œâ”€â”€ / â†’ Dashboard.tsx
+â”‚         â”œâ”€â”€ MarketPulseSummary
+â”‚         â”œâ”€â”€ TopOpportunitiesPreview
+â”‚         â””â”€â”€ WatchlistQuickView
+â”‚
+â”œâ”€â”€ /scanner â†’ Scanner.tsx
+â”‚         â”œâ”€â”€ ScanControls (ScanButton + Stats)
+â”‚         â”œâ”€â”€ FilterBar
+â”‚         â””â”€â”€ OpportunityList
+â”‚               â””â”€â”€ OpportunityCard Ã— N
+â”‚
+â”œâ”€â”€ /stock/:symbol â†’ StockDetail.tsx
+â”‚         â””â”€â”€ StockTabs
+â”‚               â”œâ”€â”€ OverviewTab
+â”‚               â”‚     â”œâ”€â”€ PriceHeader
+â”‚               â”‚     â”œâ”€â”€ ReasoningBox (LLM text)
+â”‚               â”‚     â””â”€â”€ DecisionCard (BUY/WATCH/AVOID)
+â”‚               â”œâ”€â”€ SignalsTab
+â”‚               â”‚     â”œâ”€â”€ BreakoutSignalCard
+â”‚               â”‚     â”œâ”€â”€ VolumeSpikeCard
+â”‚               â”‚     â””â”€â”€ BulkDealCard
+â”‚               â”œâ”€â”€ BacktestTab
+â”‚               â”‚     â”œâ”€â”€ BacktestStats
+â”‚               â”‚     â””â”€â”€ HistoricalCasesTable
+â”‚               â”œâ”€â”€ TradePlanTab
+â”‚               â”‚     â”œâ”€â”€ EntryTargetStopLoss
+â”‚               â”‚     â””â”€â”€ ConfidenceBreakdown
+â”‚               â””â”€â”€ ChartTab
+â”‚                     â”œâ”€â”€ PriceChart
+â”‚                     â”œâ”€â”€ VolumeChart
+â”‚                     â””â”€â”€ SignalMarkers
+â”‚
+â”œâ”€â”€ /history â†’ History.tsx
+â”‚         â”œâ”€â”€ TrackRecordStats (win rate, total decisions)
+â”‚         â”œâ”€â”€ FilterBar (date, outcome, symbol)
+â”‚         â””â”€â”€ DecisionTable â†’ DecisionDetail (modal)
+â”‚
+â”œâ”€â”€ /watchlist â†’ Watchlist.tsx
+â”‚         â””â”€â”€ WatchlistCard Ã— N
+â”‚
+â””â”€â”€ /alerts â†’ Alerts.tsx
+          â””â”€â”€ AlertItem Ã— N
 ```
 
 ---
@@ -233,17 +233,17 @@ App.tsx (React Router)
 
 ```
 stocks (master list)
-   │
-   │ 1:N
-   ▼
-scan_results ←──── scan_runs
-   │                    (1 scan run → many scan results)
-   │ 1:1
-   ▼
+   â”‚
+   â”‚ 1:N
+   â–¼
+scan_results â†â”€â”€â”€â”€ scan_runs
+   â”‚                    (1 scan run â†’ many scan results)
+   â”‚ 1:1
+   â–¼
 decisions
-   │
-   │ 1:1
-   ▼
+   â”‚
+   â”‚ 1:1
+   â–¼
 decision_outcomes (T+5 measurements)
 
 watchlist_items (user's tracked stocks)
@@ -259,35 +259,35 @@ audit_logs (system event log)
 ## 6. Infrastructure Overview
 
 ```
-┌──────────────────────────────────────────┐
-│           PRODUCTION (Railway)           │
-│                                          │
-│  ┌─────────┐   ┌─────────┐              │
-│  │ Backend │   │ Worker  │              │
-│  │ FastAPI │   │ Celery  │              │
-│  │ :8000   │   │         │              │
-│  └────┬────┘   └────┬────┘              │
-│       │              │                  │
-│  ┌────▼──────────────▼────┐             │
-│  │       Redis            │             │
-│  │  Queue + Cache         │             │
-│  └────────────────────────┘             │
-│                                          │
-│  ┌─────────────────────────┐            │
-│  │      PostgreSQL         │            │
-│  │   (Railway managed)     │            │
-│  └─────────────────────────┘            │
-│                                          │
-│  ┌─────────────────────────┐            │
-│  │      Frontend           │            │
-│  │   React + Nginx :3000   │            │
-│  └─────────────────────────┘            │
-│                                          │
-│  External calls:                         │
-│  → yfinance (market data)               │
-│  → NSE APIs (bulk deals)                │
-│  → Anthropic API (LLM)                  │
-└──────────────────────────────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚           PRODUCTION (Railway)           â”‚
+â”‚                                          â”‚
+â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”   â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”              â”‚
+â”‚  â”‚ Backend â”‚   â”‚ Worker  â”‚              â”‚
+â”‚  â”‚ FastAPI â”‚   â”‚ Celery  â”‚              â”‚
+â”‚  â”‚ :8000   â”‚   â”‚         â”‚              â”‚
+â”‚  â””â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”˜   â””â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”˜              â”‚
+â”‚       â”‚              â”‚                  â”‚
+â”‚  â”Œâ”€â”€â”€â”€â–¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â–¼â”€â”€â”€â”€â”             â”‚
+â”‚  â”‚       Redis            â”‚             â”‚
+â”‚  â”‚  Queue + Cache         â”‚             â”‚
+â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜             â”‚
+â”‚                                          â”‚
+â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”            â”‚
+â”‚  â”‚      PostgreSQL         â”‚            â”‚
+â”‚  â”‚   (Railway managed)     â”‚            â”‚
+â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜            â”‚
+â”‚                                          â”‚
+â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”            â”‚
+â”‚  â”‚      Frontend           â”‚            â”‚
+â”‚  â”‚   React + Nginx :3000   â”‚            â”‚
+â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜            â”‚
+â”‚                                          â”‚
+â”‚  External calls:                         â”‚
+â”‚  â†’ yfinance (market data)               â”‚
+â”‚  â†’ NSE APIs (bulk deals)                â”‚
+â”‚  â†’ Gemini API (LLM)                  â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 ```
 
 ---

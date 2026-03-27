@@ -1,14 +1,28 @@
-import time
-from typing import Dict
-from anthropic import Anthropic
+from __future__ import annotations
+
 from config import settings
 from loguru import logger
+
+try:
+    from google import genai
+    from google.genai import types
+except ImportError:  # pragma: no cover - exercised by fallback behavior
+    genai = None
+    types = None
+
 
 class ReasoningAgent:
     def __init__(self):
         # We attempt configuration safely; fallbacks allow un-gated mock running
-        self.api_key = settings.ANTHROPIC_API_KEY
-        self.client = Anthropic(api_key=self.api_key) if self.api_key else None
+        self.api_key = settings.GEMINI_API_KEY
+        self.model = settings.GEMINI_MODEL
+        self.max_output_tokens = settings.LLM_MAX_TOKENS
+        self.client = None
+
+        if self.api_key and genai is not None:
+            self.client = genai.Client(api_key=self.api_key)
+        elif self.api_key and genai is None:
+            logger.warning("google-genai is not installed. Using fallback reasoning generator.")
 
     def generate_explanation(self, symbol: str, current_price: float, signals: dict, backtest: dict) -> str:
         """
@@ -20,23 +34,31 @@ class ReasoningAgent:
         prompt_context = self._build_prompt_context(symbol, current_price, signals, backtest)
         
         if not self.client:
-            logger.warning("Anthropic API key not set. Using fallback reasoning generator.")
+            logger.warning("Gemini API key not set. Using fallback reasoning generator.")
             return self._fallback_explanation(symbol, current_price, signals, backtest)
 
         try:
-            response = self.client.messages.create(
-                model="claude-3-haiku-20240307",
-                max_tokens=250,
-                temperature=0.2,
-                system="You are an expert quantitative analyst. Explain this trading setup in 3-4 plain English sentences using the exact data values provided. Do not use generic filler. Be specific and data-driven.",
-                messages=[
-                    {"role": "user", "content": prompt_context}
-                ]
+            response = self.client.models.generate_content(
+                model=self.model,
+                contents=prompt_context,
+                config=types.GenerateContentConfig(
+                    system_instruction=(
+                        "You are an expert quantitative analyst. Explain this trading setup in "
+                        "3-4 plain English sentences using the exact data values provided. "
+                        "Do not use generic filler. Be specific and data-driven."
+                    ),
+                    temperature=0.2,
+                    max_output_tokens=self.max_output_tokens,
+                ),
             )
-            return response.content[0].text
+            if response.text:
+                return response.text.strip()
+
+            logger.warning("Gemini returned no text. Using fallback reasoning generator.")
         except Exception as e:
             logger.error(f"LLM Error: {e}")
-            return self._fallback_explanation(symbol, current_price, signals, backtest)
+
+        return self._fallback_explanation(symbol, current_price, signals, backtest)
 
     def _build_prompt_context(self, symbol, current_price, signals, backtest) -> str:
         s = f"Stock: {symbol}\nCurrent Price: {current_price}\n"

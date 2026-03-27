@@ -1,12 +1,12 @@
-# 04 — System Architecture
+# 04 â€” System Architecture
 
-## AlphaHunter AI — Opportunity & Decision Engine
+## AlphaHunter AI â€” Opportunity & Decision Engine
 
 ---
 
 ## 1. Overview
 
-This document defines the full system architecture of AlphaHunter AI — a multi-agent autonomous decision engine for stock market opportunity detection. The system is designed as a pipeline of modular agents, each with a single responsibility, feeding outputs into the next stage.
+This document defines the full system architecture of AlphaHunter AI â€” a multi-agent autonomous decision engine for stock market opportunity detection. The system is designed as a pipeline of modular agents, each with a single responsibility, feeding outputs into the next stage.
 
 ---
 
@@ -25,32 +25,32 @@ This document defines the full system architecture of AlphaHunter AI — a multi
 ## 3. High-Level Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                    ALPHAHUNTER AI                   │
-├─────────────────────────────────────────────────────┤
-│                                                     │
-│   ┌──────────┐   ┌──────────┐   ┌───────────────┐  │
-│   │ Scheduler│──▶│   Data   │──▶│    Signal     │  │
-│   │  Agent   │   │  Agent   │   │    Agent      │  │
-│   └──────────┘   └──────────┘   └───────┬───────┘  │
-│                                         │           │
-│   ┌──────────────────────────────────── ▼ ───────┐  │
-│   │              Reasoning Agent (LLM)           │  │
-│   └──────────────────────────────────┬───────────┘  │
-│                                      │              │
-│   ┌──────────┐   ┌──────────────────▼────────────┐  │
-│   │Backtest  │◀──│         Decision Agent        │  │
-│   │  Agent   │──▶│                               │  │
-│   └──────────┘   └───────────────────────────────┘  │
-│                                      │              │
-│   ┌──────────────────────────────────▼────────────┐  │
-│   │               Audit Agent                    │  │
-│   └──────────────────────────────────────────────┘  │
-│                                      │              │
-│   ┌──────────────────────────────────▼────────────┐  │
-│   │              API / UI Layer                   │  │
-│   └──────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚                    ALPHAHUNTER AI                   â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚                                                     â”‚
+â”‚   â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”   â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”   â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”‚
+â”‚   â”‚ Schedulerâ”‚â”€â”€â–¶â”‚   Data   â”‚â”€â”€â–¶â”‚    Signal     â”‚  â”‚
+â”‚   â”‚  Agent   â”‚   â”‚  Agent   â”‚   â”‚    Agent      â”‚  â”‚
+â”‚   â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜   â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜   â””â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚
+â”‚                                         â”‚           â”‚
+â”‚   â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ â–¼ â”€â”€â”€â”€â”€â”€â”€â”  â”‚
+â”‚   â”‚              Reasoning Agent (LLM)           â”‚  â”‚
+â”‚   â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚
+â”‚                                      â”‚              â”‚
+â”‚   â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”   â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â–¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”‚
+â”‚   â”‚Backtest  â”‚â—€â”€â”€â”‚         Decision Agent        â”‚  â”‚
+â”‚   â”‚  Agent   â”‚â”€â”€â–¶â”‚                               â”‚  â”‚
+â”‚   â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜   â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚
+â”‚                                      â”‚              â”‚
+â”‚   â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â–¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”‚
+â”‚   â”‚               Audit Agent                    â”‚  â”‚
+â”‚   â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚
+â”‚                                      â”‚              â”‚
+â”‚   â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â–¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”‚
+â”‚   â”‚              API / UI Layer                   â”‚  â”‚
+â”‚   â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 ```
 
 ---
@@ -62,7 +62,7 @@ This document defines the full system architecture of AlphaHunter AI — a multi
 **Role:** Orchestrates periodic scan cycles
 
 **Responsibilities:**
-- Triggers scan pipeline every 15 minutes during market hours (9:15 AM – 3:30 PM IST)
+- Triggers scan pipeline every 15 minutes during market hours (9:15 AM â€“ 3:30 PM IST)
 - Manages scan queue for 100+ stocks
 - Handles backpressure (rate limiting of external API calls)
 - Emits scan lifecycle events: `scan.started`, `scan.completed`, `scan.failed`
@@ -112,7 +112,7 @@ This document defines the full system architecture of AlphaHunter AI — a multi
 - Evaluates breakout signal: `current_price > max(close, 30d)`
 - Evaluates volume spike: `today_volume > 2.0 * avg_volume(20d)`
 - Evaluates bulk deal: presence of institutional buy in last 5 days
-- Computes signal strength scores (0–1 per signal)
+- Computes signal strength scores (0â€“1 per signal)
 - Composes composite signal object
 
 **Technology:** Python, NumPy, pandas
@@ -156,10 +156,10 @@ This document defines the full system architecture of AlphaHunter AI — a multi
 **Responsibilities:**
 - Receives `SignalReport` as structured input
 - Constructs a tightly constrained LLM prompt
-- Returns 3–5 sentence explanation referencing exact data values
+- Returns 3â€“5 sentence explanation referencing exact data values
 - Validates that output is data-linked (post-processing check)
 
-**Technology:** Python, Anthropic Claude API (`claude-sonnet-4-20250514`)
+**Technology:** Python, Gemini API (`gemini-2.5-flash`)
 
 **Inputs:** `SignalReport` object
 **Outputs:** `ReasoningText` string
@@ -175,7 +175,7 @@ Write the explanation now:
 ```
 
 **Example output:**
-> "Infosys crossed its 30-day resistance of ₹1,500 at ₹1,502, a level that has held for 4 weeks. Volume today reached 4.6M shares — 2.3x the 20-day average of 2.0M — indicating strong institutional demand. Axis Mutual Fund executed a bulk purchase of 500,000 shares at ₹1,495 on March 22, confirming smart-money accumulation. Historical breakout patterns on Infosys show a 4/5 success rate with average 5.2% gain within 5 days."
+> "Infosys crossed its 30-day resistance of â‚¹1,500 at â‚¹1,502, a level that has held for 4 weeks. Volume today reached 4.6M shares â€” 2.3x the 20-day average of 2.0M â€” indicating strong institutional demand. Axis Mutual Fund executed a bulk purchase of 500,000 shares at â‚¹1,495 on March 22, confirming smart-money accumulation. Historical breakout patterns on Infosys show a 4/5 success rate with average 5.2% gain within 5 days."
 
 ---
 
@@ -230,7 +230,7 @@ def find_similar_signals(symbol, signal_type, lookback_years=2):
 
 **Responsibilities:**
 - Computes weighted confidence score from: signal strength (40%), backtest success rate (40%), composite signal count (20%)
-- Maps confidence to action: BUY (≥70%), WATCH (50–69%), AVOID (<50%)
+- Maps confidence to action: BUY (â‰¥70%), WATCH (50â€“69%), AVOID (<50%)
 - Calculates trade parameters: entry, target, stop-loss, R:R ratio
 - Produces final `Decision` object
 
@@ -285,7 +285,7 @@ rr_ratio = (target - entry) / (entry - stop_loss)
 | Scheduler | APScheduler |
 | Data Fetching | yfinance, requests |
 | Data Processing | pandas, NumPy |
-| LLM | Anthropic Claude API |
+| LLM | Gemini API |
 | Database | PostgreSQL (prod) / SQLite (dev) |
 | Cache | Redis |
 | ORM | SQLAlchemy |
@@ -313,45 +313,45 @@ rr_ratio = (target - entry) / (entry - stop_loss)
 
 ```
 Scheduler
-  │
-  ├─ Triggers scan for [INFY, TCS, RELIANCE, ...]
-  │
-  ▼
+  â”‚
+  â”œâ”€ Triggers scan for [INFY, TCS, RELIANCE, ...]
+  â”‚
+  â–¼
 Data Agent (per stock, parallel)
-  │
-  ├─ Returns: price, volume, history, bulk deals
-  │
-  ▼
+  â”‚
+  â”œâ”€ Returns: price, volume, history, bulk deals
+  â”‚
+  â–¼
 Signal Agent (per stock)
-  │
-  ├─ Returns: triggered signals + composite score
-  │
-  ├─ [IF no signals triggered → skip remaining pipeline]
-  │
-  ▼
+  â”‚
+  â”œâ”€ Returns: triggered signals + composite score
+  â”‚
+  â”œâ”€ [IF no signals triggered â†’ skip remaining pipeline]
+  â”‚
+  â–¼
 Reasoning Agent (LLM call)
-  │
-  ├─ Returns: explanation text
-  │
-  ▼
+  â”‚
+  â”œâ”€ Returns: explanation text
+  â”‚
+  â–¼
 Backtesting Agent
-  │
-  ├─ Returns: historical success rate + cases
-  │
-  ▼
+  â”‚
+  â”œâ”€ Returns: historical success rate + cases
+  â”‚
+  â–¼
 Decision Agent
-  │
-  ├─ Returns: action + confidence + trade params
-  │
-  ▼
+  â”‚
+  â”œâ”€ Returns: action + confidence + trade params
+  â”‚
+  â–¼
 Audit Agent
-  │
-  ├─ Persists decision to DB
-  │
-  ▼
+  â”‚
+  â”œâ”€ Persists decision to DB
+  â”‚
+  â–¼
 API Layer
-  │
-  └─ Serves results to frontend
+  â”‚
+  â””â”€ Serves results to frontend
 ```
 
 ---
@@ -360,14 +360,14 @@ API Layer
 
 - **REST API** built with FastAPI
 - Endpoints:
-  - `POST /api/scan` — trigger a full market scan
-  - `GET /api/opportunities` — retrieve latest scan results
-  - `GET /api/stock/{symbol}` — full detail for a stock
-  - `GET /api/history` — past decision log
-  - `GET /api/history/{id}` — single decision detail
-  - `GET /api/watchlist` — user's watchlist
-  - `POST /api/watchlist/{symbol}` — add to watchlist
-  - `DELETE /api/watchlist/{symbol}` — remove from watchlist
+  - `POST /api/scan` â€” trigger a full market scan
+  - `GET /api/opportunities` â€” retrieve latest scan results
+  - `GET /api/stock/{symbol}` â€” full detail for a stock
+  - `GET /api/history` â€” past decision log
+  - `GET /api/history/{id}` â€” single decision detail
+  - `GET /api/watchlist` â€” user's watchlist
+  - `POST /api/watchlist/{symbol}` â€” add to watchlist
+  - `DELETE /api/watchlist/{symbol}` â€” remove from watchlist
 
 ---
 

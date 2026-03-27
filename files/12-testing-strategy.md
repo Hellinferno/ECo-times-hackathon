@@ -1,6 +1,6 @@
-# 12 — Testing Strategy
+# 12 â€” Testing Strategy
 
-## AlphaHunter AI — Opportunity & Decision Engine
+## AlphaHunter AI â€” Opportunity & Decision Engine
 
 ---
 
@@ -28,15 +28,15 @@ For a financial decision system, the most important tests are those that verify 
 
 | Test Type | Tool | Coverage Target | Priority |
 |-----------|------|-----------------|---------|
-| Unit — Signal Agent | pytest | 95% | P0 |
-| Unit — Backtesting Agent | pytest | 95% | P0 |
-| Unit — Decision Agent | pytest | 90% | P0 |
-| Unit — Reasoning Agent | pytest + mock | 80% | P1 |
-| Unit — Data Agent | pytest + mock | 75% | P1 |
-| Integration — API Endpoints | pytest + httpx | 80% | P1 |
-| Integration — Full Scan Pipeline | pytest | Key flows | P1 |
-| Frontend — Component | Vitest | Key components | P2 |
-| E2E — Demo Flow | Playwright | Demo path only | P2 |
+| Unit â€” Signal Agent | pytest | 95% | P0 |
+| Unit â€” Backtesting Agent | pytest | 95% | P0 |
+| Unit â€” Decision Agent | pytest | 90% | P0 |
+| Unit â€” Reasoning Agent | pytest + mock | 80% | P1 |
+| Unit â€” Data Agent | pytest + mock | 75% | P1 |
+| Integration â€” API Endpoints | pytest + httpx | 80% | P1 |
+| Integration â€” Full Scan Pipeline | pytest | Key flows | P1 |
+| Frontend â€” Component | Vitest | Key components | P2 |
+| E2E â€” Demo Flow | Playwright | Demo path only | P2 |
 
 ---
 
@@ -122,9 +122,9 @@ def test_db():
 
 @pytest.fixture
 def mock_anthropic_client(mocker):
-    mock = mocker.patch("agents.reasoning_agent.anthropic.Anthropic")
+    mock = mocker.patch("agents.reasoning_agent.genai.Client")
     mock.return_value.messages.create.return_value.content = [
-        type("obj", (), {"text": "INFY crossed ₹1,500 resistance with 2.3x volume. Historical success rate: 80% in 5 cases."})()
+        type("obj", (), {"text": "INFY crossed â‚¹1,500 resistance with 2.3x volume. Historical success rate: 80% in 5 cases."})()
     ]
     return mock
 
@@ -160,7 +160,7 @@ class TestBreakoutSignal:
         assert signal.triggered == True
 
     def test_breakout_not_triggered_at_resistance_level(self):
-        """Price must be STRICTLY above resistance — not equal."""
+        """Price must be STRICTLY above resistance â€” not equal."""
         data = make_synthetic_ohlcv(60, base_price=1000)
         data["Close"].iloc[-1] = data["Close"].iloc[-31:-1].max()  # exactly at resistance
         signal = detect_breakout(data, lookback_days=30)
@@ -227,7 +227,7 @@ class TestVolumeSpikeSignal:
 
     def test_spike_avg_uses_20_day_window(self):
         data = make_synthetic_ohlcv(30)
-        # Set a very high volume on day 25 (within 20d window) — should inflate avg
+        # Set a very high volume on day 25 (within 20d window) â€” should inflate avg
         data["Volume"].iloc[-6] = 50_000_000
         data["Volume"].iloc[-1] = 5_000_000
         signal = detect_volume_spike(data, threshold=2.0)
@@ -582,7 +582,7 @@ playwright test tests/e2e/
 
 | Failure Type | First Check |
 |-------------|------------|
-| Breakout signal wrong | Verify `resistance_level` calculation — is the window correct? |
+| Breakout signal wrong | Verify `resistance_level` calculation â€” is the window correct? |
 | Confidence score off | Print intermediate scores; check weight constants |
 | Backtest zero matches | Verify historical data length > 30 days + 5 days buffer |
 | LLM test failure | Check mock is patching the right module path |

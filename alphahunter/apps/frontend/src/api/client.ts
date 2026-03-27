@@ -1,4 +1,12 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
+const DEFAULT_API_BASE = "/api";
+
+function normalizeApiBase(url: string): string {
+  return url.endsWith("/") ? url.slice(0, -1) : url;
+}
+
+const API_BASE = normalizeApiBase(
+  import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE,
+);
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
