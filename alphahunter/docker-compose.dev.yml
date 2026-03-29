@@ -1,0 +1,80 @@
+version: '3.8'
+
+# ── WorldMonitor addon services ────────────────────────────────────────────────
+#
+# Optional development addon — not required to run AlphaHunter.
+# Provides the WorldMonitor macro intelligence integration.
+#
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  worldmonitor:
+    build:
+      context: ../worldmonitor
+      dockerfile: Dockerfile
+    image: worldmonitor:latest
+    container_name: alphahunter_worldmonitor
+    ports:
+      - "${WM_PORT:-3000}:8080"
+    environment:
+      UPSTASH_REDIS_REST_URL: "http://worldmonitor-redis-rest:80"
+      UPSTASH_REDIS_REST_TOKEN: "${REDIS_TOKEN:-wm-local-token}"
+      LOCAL_API_PORT: "46123"
+      LOCAL_API_MODE: "docker"
+      LOCAL_API_CLOUD_FALLBACK: "false"
+      WS_RELAY_URL: "http://ais-relay:3004"
+      LLM_API_URL: "${LLM_API_URL:-}"
+      LLM_API_KEY: "${LLM_API_KEY:-}"
+      LLM_MODEL: "${LLM_MODEL:-}"
+      GROQ_API_KEY: "${GROQ_API_KEY:-}"
+      AISSTREAM_API_KEY: "${AISSTREAM_API_KEY:-}"
+      FINNHUB_API_KEY: "${FINNHUB_API_KEY:-}"
+      EIA_API_KEY: "${EIA_API_KEY:-}"
+      FRED_API_KEY: "${FRED_API_KEY:-}"
+      ACLED_ACCESS_TOKEN: "${ACLED_ACCESS_TOKEN:-}"
+    depends_on:
+      - worldmonitor-redis-rest
+      - ais-relay
+    restart: unless-stopped
+
+  ais-relay:
+    build:
+      context: ../worldmonitor
+      dockerfile: Dockerfile.relay
+    image: worldmonitor-ais-relay:latest
+    container_name: alphahunter_ais_relay
+    environment:
+      AISSTREAM_API_KEY: "${AISSTREAM_API_KEY:-}"
+      PORT: "3004"
+    restart: unless-stopped
+
+  worldmonitor-redis:
+    image: redis:7-alpine
+    container_name: alphahunter_worldmonitor_redis
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - worldmonitor-redis-data:/data
+    restart: unless-stopped
+
+  worldmonitor-redis-rest:
+    build:
+      context: ../worldmonitor
+      dockerfile: docker/Dockerfile.redis-rest
+    image: worldmonitor-redis-rest:latest
+    container_name: alphahunter_worldmonitor_redis_rest
+    ports:
+      - "8079:80"
+    environment:
+      SRH_TOKEN: "${REDIS_TOKEN:-wm-local-token}"
+      SRH_CONNECTION_STRING: "redis://worldmonitor-redis:6379"
+    depends_on:
+      - worldmonitor-redis
+    restart: unless-stopped
+
+  # Override backend to include WorldMonitor URL
+  backend:
+    environment:
+      WORLDMONITOR_API_URL: http://worldmonitor:8080
+
+volumes:
+  worldmonitor-redis-data:

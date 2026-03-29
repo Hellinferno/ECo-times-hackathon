@@ -1,3 +1,10 @@
+"""ExternalSignalEvent — cached enrichment signal from TinyFish or other web-intel sources.
+
+event_type: news_sentiment | social_sentiment | insider_filing | macro_context.
+expires_at controls TTL; the pipeline skips stale events (expires_at < now).
+dedupe_hash is a SHA-256 of (symbol, event_type, source, payload) so that
+re-fetching the same event doesn't create duplicates.
+"""
 from sqlalchemy import Column, Integer, String, DateTime, Numeric, JSON, UniqueConstraint, Index
 from .base import Base
 import datetime

@@ -1,3 +1,13 @@
+"""AuditAgent — persistence layer for scan results, decisions, and shadow diffs.
+
+Wraps the database writes that complete each pipeline iteration:
+  log_scan_result   — persist ScanResult row and return its integer id
+  log_decision      — persist Decision row linked to a ScanResult
+  log_shadow_diff   — persist ShadowSignalDiff row for A/B mode comparison
+
+All methods swallow exceptions internally and return None / False on failure
+so that a database error in one stock does not abort the entire scan run.
+"""
 from sqlalchemy.orm import Session
 from models.db import ScanResult, Decision, ShadowSignalDiff
 from loguru import logger
@@ -49,7 +59,7 @@ class AuditAgent:
             return None
 
     def log_decision(self, scan_result_id: int, symbol: str, decision_data: dict, full_snapshot: dict):
-        """Creates the formal, auditable decision track record."""
+        """Creates the formal, auditable decision track record. Returns the Decision ORM object."""
         try:
             db_decision = Decision(
                 scan_result_id=scan_result_id,
@@ -67,9 +77,12 @@ class AuditAgent:
             )
             self.db.add(db_decision)
             self.db.commit()
+            self.db.refresh(db_decision)
+            return db_decision
         except Exception as e:
             self.db.rollback()
             logger.error(f"Audit log failed for decision {symbol}: {e}")
+            return None
 
     def log_shadow_diff(
         self,

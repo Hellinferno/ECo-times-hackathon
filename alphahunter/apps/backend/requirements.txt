@@ -1,17 +1,35 @@
-fastapi
+# ── Web framework ──────────────────────────────────────────────────────────────
+fastapi>=0.111,<1
 uvicorn[standard]
-sqlalchemy
+
+# ── Database ───────────────────────────────────────────────────────────────────
+sqlalchemy>=2,<3
 alembic
 psycopg2-binary
-pytest
+
+# ── AI / LLM ───────────────────────────────────────────────────────────────────
+google-genai>=1,<2
+
+# ── Data & signals ─────────────────────────────────────────────────────────────
 yfinance
-APScheduler
-pydantic
-pydantic-settings
-redis
-google-genai
-tenacity
-celery[redis]
-python-dotenv
+tenacity>=8,<10
 requests
+nse[server]          # BennyThadikaran/NseIndiaApi — NSE bulk/block deal fetcher
+
+# ── Task scheduling ────────────────────────────────────────────────────────────
+APScheduler>=3,<4
+
+# ── Configuration & validation ─────────────────────────────────────────────────
+pydantic>=2,<3
+pydantic-settings>=2,<3
+python-dotenv
+
+# ── Observability ──────────────────────────────────────────────────────────────
 loguru
+
+# ── Caching ────────────────────────────────────────────────────────────────────
+redis
+
+# ── Utilities ──────────────────────────────────────────────────────────────────
+python-multipart
+

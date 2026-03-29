@@ -1,3 +1,14 @@
+"""DecisionAgent — score-to-action translator and trade parameter calculator.
+
+Combines the signal composite score and backtest quality into a single
+confidence value, then maps it to an action:
+  >= 70%  → BUY   (high conviction)
+  50–69%  → WATCH (monitor closely)
+  < 50%   → AVOID (insufficient evidence)
+
+Also computes entry price, target price, stop loss, and R:R ratio from
+the current price and signal details.
+"""
 import math
 from typing import Dict, Any
 

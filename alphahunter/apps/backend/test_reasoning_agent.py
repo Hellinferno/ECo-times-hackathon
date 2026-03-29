@@ -68,6 +68,26 @@ def test_generate_explanation_uses_gemini_when_configured(monkeypatch):
     assert agent.client.models.calls[0]["model"] == "gemini-2.5-flash"
     assert "Stock: INFY" in agent.client.models.calls[0]["contents"]
     assert agent.client.models.calls[0]["config"]["max_output_tokens"] == 180
+    assert "system_instruction" in agent.client.models.calls[0]["config"]
+    assert "quantitative analyst" in agent.client.models.calls[0]["config"]["system_instruction"].lower()
+
+
+def test_generate_explanation_falls_back_when_genai_not_installed(monkeypatch):
+    """Covers the elif branch: API key is set but google-genai library is missing."""
+    monkeypatch.setattr(reasoning_module.settings, "GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr(reasoning_module, "genai", None)
+    monkeypatch.setattr(reasoning_module, "types", None)
+
+    agent = ReasoningAgent()
+
+    # Client must not be set — no library to call
+    assert agent.client is None
+
+    result = agent.generate_explanation("INFY", 1525.0, _signals(), _backtest())
+
+    # Falls back to template explanation
+    assert "INFY presents a potential opportunity" in result
+    assert "Historically, this pattern succeeded 66.7%" in result
 
 
 def test_generate_explanation_falls_back_when_gemini_fails(monkeypatch):

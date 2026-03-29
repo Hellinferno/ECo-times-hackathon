@@ -1,3 +1,11 @@
+"""ShadowSignalDiff — A/B comparison record for pipeline shadow mode.
+
+Populated by AuditAgent.log_shadow_diff() when data_pipeline_mode = "shadow".
+Captures the legacy 3-signal score vs the new 7-signal grouped score and the
+resulting action for each, enabling statistical analysis before the new scoring
+is promoted to the active mode.
+diff_payload holds arbitrary diagnostic fields (confidences, mode_effective, etc.).
+"""
 from sqlalchemy import Column, Integer, String, DateTime, Numeric, ForeignKey, JSON, Index
 from .base import Base
 import datetime

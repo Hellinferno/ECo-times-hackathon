@@ -1,3 +1,14 @@
+"""Unit tests for SignalAgent external (7-signal) mode.
+
+Tests:
+  test_signal_agent_active_mode_uses_grouped_scoring
+    Verifies that mode="active" with full external_context produces a grouped
+    composite score and activates news_sentiment + social_sentiment signals.
+
+  test_signal_agent_active_mode_falls_back_without_external_data
+    Verifies that mode="active" with no external_context falls back to
+    legacy_fallback mode (3 signals, legacy composite score).
+"""
 from agents.signal_agent import SignalAgent
 
 

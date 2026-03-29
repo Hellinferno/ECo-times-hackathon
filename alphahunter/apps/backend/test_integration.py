@@ -1,3 +1,11 @@
+"""Integration smoke test — runs the full multi-agent pipeline against live market data.
+
+Iterates over 14 NSE blue-chip symbols and exercises:
+  DataAgent → SignalAgent → BacktestingAgent → DecisionAgent
+
+Prints per-symbol diagnostics to stdout. Intended to be run manually against
+a live database (not in CI); use pytest -k test_integration to invoke.
+"""
 from database import SessionLocal
 from agents import DataAgent, SignalAgent, BacktestingAgent, ReasoningAgent, DecisionAgent
 

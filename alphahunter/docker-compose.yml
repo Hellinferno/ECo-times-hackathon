@@ -1,5 +1,22 @@
 version: '3.8'
 
+# ── AlphaHunter Core Stack ────────────────────────────────────────────────────
+#
+# Contains only the services required to run AlphaHunter:
+#   postgres   — primary database
+#   redis      — market data cache + task queue
+#   backend    — FastAPI + agent pipeline
+#   frontend   — React dev server (for local development)
+#
+# For the WorldMonitor addon services, use:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# Production deployments:
+#   Backend  → Railway (single replica, required for APScheduler)
+#   Frontend → Vercel (static SPA)
+#   Database → Railway PostgreSQL
+#   Redis    → Upstash / Railway Redis
+
 services:
   postgres:
     image: postgres:15-alpine
@@ -13,18 +30,26 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U alphahunter -d alphahunter_dev"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-alphahunter} -d ${DB_NAME:-alphahunter_dev}"]
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
     container_name: alphahunter_redis
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
     ports:
       - "6379:6379"
     volumes:
       - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
 
   backend:
     build:
@@ -37,15 +62,26 @@ services:
       - .env
     environment:
       DB_HOST: postgres
+      DB_PORT: "5432"
       REDIS_HOST: redis
+      REDIS_PORT: "6379"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
     volumes:
-      - ./apps/backend:/app
+      - ./apps/backend:/app  # hot-reload in dev — remove in production
+    # NOTE: --reload is for local development only.
+    # Production Railway deploy uses: uvicorn main:app --host 0.0.0.0 --port $PORT
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
 
   frontend:
     build:
@@ -57,10 +93,12 @@ services:
     environment:
       VITE_PROXY_TARGET: http://backend:8000
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     volumes:
-      - ./apps/frontend/src:/app/src
+      - ./apps/frontend/src:/app/src  # hot-reload in dev
     command: npm run dev -- --host 0.0.0.0
+    restart: unless-stopped
 
 volumes:
   pgdata:

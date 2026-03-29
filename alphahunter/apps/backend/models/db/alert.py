@@ -1,3 +1,10 @@
+"""Alert — in-app notification linked to a scan decision.
+
+alert_type: signal_triggered | outcome_measured | manual.
+is_read: False until the user views the alert center.
+Linked to a Decision via decision_id (nullable — alerts can exist without a
+specific decision, e.g. system health alerts).
+"""
 from sqlalchemy import Column, Integer, String, Boolean, Numeric, Text, DateTime, ForeignKey, Index, Uuid
 from .base import Base
 import datetime

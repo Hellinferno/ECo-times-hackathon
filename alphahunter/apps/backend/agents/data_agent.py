@@ -1,18 +1,80 @@
+"""DataAgent — market data fetcher and external signal prefetch coordinator.
+
+Responsibilities
+----------------
+  get_market_data               Fetch OHLCV + current price via yfinance
+  get_bulk_deals                Load institutional bulk-deal records (DB or live)
+  get_external_context          Merge web-intel signals for a symbol from cache
+  get_historical_data_for_backtest  Pull 2-year daily data for BacktestingAgent
+  get_chart_data                Return formatted OHLCV for the frontend chart view
+  ensure_external_signals_prefetched  Batch-prefetch TinyFish signals before the scan loop
+  get_pipeline_mode             Read the current pipeline mode from runtime settings
+"""
 from __future__ import annotations
 
 import datetime
+import json
 from typing import Any, Dict, List, Optional
 
+import redis as redis_lib
 import yfinance as yf
 from loguru import logger
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from config import settings as app_settings
 from models.db.bulk_deal import BulkDeal
 from models.db.external_signal_event import ExternalSignalEvent
 from services.web_intel_service import WebIntelService
 from utils.runtime_settings import get_runtime_settings, parse_int
+
+
+# ── Redis market data cache ────────────────────────────────────────────────────
+
+_redis_client: Optional[redis_lib.Redis] = None
+
+
+def _get_redis() -> Optional[redis_lib.Redis]:
+    """Return a shared Redis client, or None if Redis is unavailable."""
+    global _redis_client
+    if _redis_client is not None:
+        return _redis_client
+    try:
+        client = redis_lib.from_url(app_settings.redis_url, decode_responses=True, socket_timeout=2)
+        client.ping()
+        _redis_client = client
+        return _redis_client
+    except Exception as exc:
+        logger.debug(f"Redis unavailable, market data cache disabled: {exc}")
+        return None
+
+
+def _cache_get(key: str) -> Any:
+    client = _get_redis()
+    if not client:
+        return None
+    try:
+        raw = client.get(key)
+        return json.loads(raw) if raw else None
+    except Exception:
+        return None
+
+
+def _cache_set(key: str, value: Any, ttl_secs: int) -> None:
+    client = _get_redis()
+    if not client:
+        return
+    try:
+        client.setex(key, ttl_secs, json.dumps(value))
+    except Exception:
+        pass
+
+
+def _log_and_return(retry_state, fallback):
+    """Log the final retry failure and return a safe fallback value."""
+    logger.error(f"All retries exhausted: {retry_state.outcome.exception()}")
+    return fallback
 
 
 class DataAgent:
@@ -34,72 +96,119 @@ class DataAgent:
             logger.warning(f"External prefetch failed, continuing in fail-open mode: {exc}")
             return {"failed": True, "fail_open": True, "error": str(exc)}
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry_error_callback=lambda retry_state: _log_and_return(retry_state, None),
+    )
     def get_market_data(self, symbol: str, lookback_days: int = 60, lookback_years: int = 2):
         """
         Fetches normalized OHLCV data using yfinance.
+        Results are cached in Redis for 5 minutes (during market hours) to reduce
+        API calls when multiple pipeline workers process the same symbol.
         Note: Indian stocks on Yahoo Finance need the .NS extension.
         """
+        cache_key = f"alphahunter:market_data:{symbol}:{lookback_days}d"
+        cached = _cache_get(cache_key)
+        if cached:
+            logger.debug(f"Cache hit: market_data {symbol}")
+            return cached
+
         yf_symbol = f"{symbol}.NS"
-        try:
-            ticker = yf.Ticker(yf_symbol)
-            short_term_data = ticker.history(period=f"{lookback_days}d")
+        ticker = yf.Ticker(yf_symbol)
+        short_term_data = ticker.history(period=f"{lookback_days}d")
 
-            if short_term_data.empty:
-                return None
-
-            current_price = float(short_term_data["Close"].iloc[-1])
-            volume_today = int(short_term_data["Volume"].iloc[-1])
-
-            ohlcv_short = []
-            for date, row in short_term_data.iterrows():
-                ohlcv_short.append(
-                    {
-                        "date": date.strftime("%Y-%m-%d"),
-                        "open": float(row["Open"]),
-                        "high": float(row["High"]),
-                        "low": float(row["Low"]),
-                        "close": float(row["Close"]),
-                        "volume": int(row["Volume"]),
-                    }
-                )
-
-            return {
-                "symbol": symbol,
-                "current_price": current_price,
-                "volume_today": volume_today,
-                "ohlcv_short": ohlcv_short,
-            }
-        except Exception as e:
-            logger.error(f"Error fetching data for {symbol}: {str(e)}")
+        if short_term_data.empty:
             return None
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-    def get_historical_data_for_backtest(self, symbol: str, lookback_years: int = 2):
-        """Fetch historical data for backtesting."""
-        yf_symbol = f"{symbol}.NS"
-        try:
-            ticker = yf.Ticker(yf_symbol)
-            hist_data = ticker.history(period=f"{lookback_years}y")
-            if hist_data.empty:
-                return []
+        current_price = float(short_term_data["Close"].iloc[-1])
+        volume_today = int(short_term_data["Volume"].iloc[-1])
 
-            ohlcv = []
-            for date, row in hist_data.iterrows():
-                ohlcv.append(
-                    {
-                        "date": date.strftime("%Y-%m-%d"),
-                        "open": float(row["Open"]),
-                        "high": float(row["High"]),
-                        "low": float(row["Low"]),
-                        "close": float(row["Close"]),
-                        "volume": int(row["Volume"]),
-                    }
-                )
-            return ohlcv
-        except Exception as e:
-            logger.error(f"Error fetching backtest history for {symbol}: {str(e)}")
+        ohlcv_short = []
+        for date, row in short_term_data.iterrows():
+            ohlcv_short.append(
+                {
+                    "date": date.strftime("%Y-%m-%d"),
+                    "open": float(row["Open"]),
+                    "high": float(row["High"]),
+                    "low": float(row["Low"]),
+                    "close": float(row["Close"]),
+                    "volume": int(row["Volume"]),
+                }
+            )
+
+        result = {
+            "symbol": symbol,
+            "current_price": current_price,
+            "volume_today": volume_today,
+            "ohlcv_short": ohlcv_short,
+        }
+        _cache_set(cache_key, result, ttl_secs=300)  # 5-minute TTL — live market data
+        return result
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry_error_callback=lambda retry_state: _log_and_return(retry_state, []),
+    )
+    def get_historical_data_for_backtest(self, symbol: str, lookback_years: int = 2):
+        """
+        Fetch historical data for backtesting.
+        Cached in Redis for 24 hours — 2-year history changes slowly.
+        """
+        cache_key = f"alphahunter:hist_data:{symbol}:{lookback_years}y"
+        cached = _cache_get(cache_key)
+        if cached:
+            logger.debug(f"Cache hit: hist_data {symbol}")
+            return cached
+
+        yf_symbol = f"{symbol}.NS"
+        ticker = yf.Ticker(yf_symbol)
+        hist_data = ticker.history(period=f"{lookback_years}y")
+        if hist_data.empty:
             return []
+
+        ohlcv = []
+        for date, row in hist_data.iterrows():
+            ohlcv.append(
+                {
+                    "date": date.strftime("%Y-%m-%d"),
+                    "open": float(row["Open"]),
+                    "high": float(row["High"]),
+                    "low": float(row["Low"]),
+                    "close": float(row["Close"]),
+                    "volume": int(row["Volume"]),
+                }
+            )
+        _cache_set(cache_key, ohlcv, ttl_secs=86400)  # 24-hour TTL — historical data
+        return ohlcv
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry_error_callback=lambda retry_state: _log_and_return(retry_state, []),
+    )
+    def get_chart_data(self, symbol: str, period: str = "6mo", interval: str = "1d") -> List[Dict[str, Any]]:
+        """Fetch chart-friendly OHLCV data for the stock detail chart tab."""
+        yf_symbol = f"{symbol}.NS"
+        ticker = yf.Ticker(yf_symbol)
+        chart_data = ticker.history(period=period, interval=interval)
+        if chart_data.empty:
+            return []
+
+        ohlcv: List[Dict[str, Any]] = []
+        for date, row in chart_data.iterrows():
+            ohlcv.append(
+                {
+                    "date": date.strftime("%Y-%m-%d"),
+                    "open": float(row["Open"]),
+                    "high": float(row["High"]),
+                    "low": float(row["Low"]),
+                    "close": float(row["Close"]),
+                    "volume": int(row["Volume"]),
+                }
+            )
+        return ohlcv
 
     def get_bulk_deals(self, symbol: str, as_of: Optional[datetime.datetime] = None, prefer_live: bool = True):
         """

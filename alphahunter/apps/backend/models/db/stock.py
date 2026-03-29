@@ -1,3 +1,10 @@
+"""Stock — NSE/BSE equity universe entry.
+
+is_active = True means the stock is included in scheduled scans.
+market_cap_cr stores market capitalisation in Indian crores.
+nse_code / bse_code / isin provide exchange-specific identifiers for
+data-feed lookups (yfinance uses symbol + ".NS" suffix).
+"""
 from sqlalchemy import Column, Integer, String, Boolean, Numeric, DateTime, func
 from .base import Base
 import datetime

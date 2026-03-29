@@ -1,296 +1,392 @@
-import { useState, useEffect } from "react";
+/**
+ * Settings — engine configuration UI.
+ *
+ * Tabs: alerts | signals | scanner | pipeline
+ *
+ * SETTING_DEFINITIONS drives every control declaratively — add/change a setting
+ * by editing the array, not by adding new JSX. Supported kinds:
+ *   range    — slider with min/max/step and live % display
+ *   select   — <select> from a fixed options list
+ *   number   — free-form numeric input
+ *   toggle   — single boolean on/off button
+ *
+ * Save sends only the changed keys (delta diff against originalValues).
+ */
+import { useEffect, useMemo, useState } from "react";
+import { RotateCcw, Save } from "lucide-react";
 import { api } from "./api/client";
-import { Settings as SettingsIcon, Save, RotateCcw } from "lucide-react";
+import {
+  Button,
+  ErrorState,
+  FieldLabel,
+  LoadingState,
+  PageHeader,
+  Panel,
+  SectionTabs,
+} from "./components/ui";
 
-interface SettingDef {
+type SettingsTab = "alerts" | "signals" | "scanner" | "pipeline";
+
+interface SettingDefinition {
   key: string;
   label: string;
   description: string;
-  type: "number" | "text";
+  tab: SettingsTab;
+  kind: "number" | "range" | "select" | "toggle";
   unit?: string;
-  group: string;
+  min?: number;
+  max?: number;
+  step?: number;
+  options?: string[];
 }
 
-const SETTING_DEFS: SettingDef[] = [
+const SETTING_DEFINITIONS: SettingDefinition[] = [
   {
-    key: "scan_interval_minutes",
-    label: "Scan Interval",
-    description: "Minutes between automatic scans during market hours",
-    type: "number",
-    unit: "min",
-    group: "Scanning",
+    key: "default_alert_confidence_threshold",
+    label: "Alert confidence threshold",
+    description: "Minimum confidence required before AlphaHunter generates an in-app alert.",
+    tab: "alerts",
+    kind: "range",
+    min: 0,
+    max: 100,
+    step: 5,
+    unit: "%",
   },
   {
     key: "confidence_buy_threshold",
-    label: "BUY Threshold",
-    description: "Minimum confidence to recommend BUY",
-    type: "number",
+    label: "BUY threshold",
+    description: "Minimum conviction required to escalate an idea into a BUY recommendation.",
+    tab: "alerts",
+    kind: "range",
+    min: 40,
+    max: 95,
+    step: 5,
     unit: "%",
-    group: "Decision Engine",
   },
   {
     key: "confidence_watch_threshold",
-    label: "WATCH Threshold",
-    description: "Minimum confidence for WATCH recommendation",
-    type: "number",
+    label: "WATCH threshold",
+    description: "Minimum conviction required to keep a name on the WATCH side of the book.",
+    tab: "alerts",
+    kind: "range",
+    min: 10,
+    max: 80,
+    step: 5,
     unit: "%",
-    group: "Decision Engine",
   },
   {
     key: "breakout_lookback_days",
-    label: "Breakout Lookback",
-    description: "Days to look back for resistance level",
-    type: "number",
+    label: "Breakout lookback",
+    description: "Window used to determine key resistance levels.",
+    tab: "signals",
+    kind: "select",
+    options: ["20", "30", "45", "60"],
     unit: "days",
-    group: "Signal Parameters",
   },
   {
     key: "volume_spike_threshold",
-    label: "Volume Spike Threshold",
-    description: "Multiplier above 20-day average for spike detection",
-    type: "number",
+    label: "Volume spike threshold",
+    description: "Multiplier above average volume required before the spike signal triggers.",
+    tab: "signals",
+    kind: "select",
+    options: ["1.5", "2.0", "2.5", "3.0"],
     unit: "x",
-    group: "Signal Parameters",
-  },
-  {
-    key: "volume_avg_period",
-    label: "Volume Avg Period",
-    description: "Days for calculating average volume",
-    type: "number",
-    unit: "days",
-    group: "Signal Parameters",
   },
   {
     key: "bulk_deal_lookback_days",
-    label: "Bulk Deal Lookback",
-    description: "Days to look back for bulk/block deals",
-    type: "number",
+    label: "Bulk deal lookback",
+    description: "How far back AlphaHunter should consider institutional bulk-deal activity relevant.",
+    tab: "signals",
+    kind: "select",
+    options: ["3", "5", "7", "10"],
     unit: "days",
-    group: "Signal Parameters",
   },
   {
     key: "backtest_lookback_years",
-    label: "Backtest Lookback",
-    description: "Years of historical data for backtesting",
-    type: "number",
+    label: "Backtest lookback",
+    description: "Historical window used to find prior matching signal patterns.",
+    tab: "signals",
+    kind: "select",
+    options: ["1", "2", "3"],
     unit: "years",
-    group: "Backtesting",
   },
   {
     key: "backtest_outcome_days",
-    label: "Outcome Measurement",
-    description: "Trading days after signal to measure outcome",
-    type: "number",
+    label: "Outcome window",
+    description: "How many trading days AlphaHunter uses to measure the post-signal result.",
+    tab: "signals",
+    kind: "select",
+    options: ["3", "5", "7", "10"],
     unit: "days",
-    group: "Backtesting",
   },
   {
-    key: "default_alert_confidence_threshold",
-    label: "Alert Confidence Threshold",
-    description: "Minimum confidence to generate an alert",
-    type: "number",
-    unit: "%",
-    group: "Alerts",
+    key: "scan_interval_minutes",
+    label: "Scan interval",
+    description: "Cadence for scheduled market scans during trading hours.",
+    tab: "scanner",
+    kind: "select",
+    options: ["5", "10", "15", "30"],
+    unit: "minutes",
   },
   {
-    key: "data_pipeline_mode",
-    label: "Pipeline Mode",
-    description: "legacy, shadow, or active scoring mode",
-    type: "text",
-    group: "Web Intel Pipeline",
+    key: "volume_avg_period",
+    label: "Average volume period",
+    description: "Rolling session count used to compute normal volume.",
+    tab: "scanner",
+    kind: "select",
+    options: ["10", "20", "30", "60"],
+    unit: "days",
   },
   {
     key: "tinyfish_timeout_secs",
-    label: "TinyFish Timeout",
-    description: "TinyFish request timeout in seconds",
-    type: "number",
-    unit: "sec",
-    group: "Web Intel Pipeline",
+    label: "TinyFish timeout",
+    description: "Timeout budget for external web-intel fetches.",
+    tab: "pipeline",
+    kind: "select",
+    options: ["10", "20", "30", "45"],
+    unit: "seconds",
   },
   {
     key: "tinyfish_max_concurrency",
-    label: "TinyFish Concurrency",
-    description: "Max concurrent TinyFish jobs",
-    type: "number",
-    group: "Web Intel Pipeline",
+    label: "TinyFish concurrency",
+    description: "Concurrent external jobs allowed in the enrichment pipeline.",
+    tab: "pipeline",
+    kind: "select",
+    options: ["5", "10", "20", "30"],
   },
   {
     key: "tinyfish_batch_size",
-    label: "TinyFish Batch Size",
-    description: "Symbols per batch for symbol-specific collectors",
-    type: "number",
-    group: "Web Intel Pipeline",
+    label: "TinyFish batch size",
+    description: "Number of symbols grouped into one external enrichment batch.",
+    tab: "pipeline",
+    kind: "select",
+    options: ["10", "20", "30", "50"],
   },
   {
     key: "tinyfish_fail_open",
-    label: "Fail Open",
-    description: "Continue with fallback sources when TinyFish fails (true/false)",
-    type: "text",
-    group: "Web Intel Pipeline",
+    label: "Fail open",
+    description: "Continue with fallback market-only intelligence if external enrichment fails.",
+    tab: "pipeline",
+    kind: "toggle",
   },
   {
-    key: "news_lookback_hours",
-    label: "News Lookback",
-    description: "Hours of news sentiment context",
-    type: "number",
-    unit: "hr",
-    group: "Web Intel Pipeline",
-  },
-  {
-    key: "social_lookback_hours",
-    label: "Social Lookback",
-    description: "Hours of social sentiment context",
-    type: "number",
-    unit: "hr",
-    group: "Web Intel Pipeline",
-  },
-  {
-    key: "insider_lookback_days",
-    label: "Insider Lookback",
-    description: "Days of insider filing context",
-    type: "number",
-    unit: "days",
-    group: "Web Intel Pipeline",
-  },
-  {
-    key: "macro_lookback_minutes",
-    label: "Macro Freshness",
-    description: "Maximum macro data age in minutes",
-    type: "number",
-    unit: "min",
-    group: "Web Intel Pipeline",
+    key: "data_pipeline_mode",
+    label: "Pipeline mode",
+    description: "Switch between legacy, shadow, and active scoring behaviour.",
+    tab: "pipeline",
+    kind: "select",
+    options: ["legacy", "shadow", "active"],
   },
 ];
 
 export default function Settings() {
+  const [tab, setTab] = useState<SettingsTab>("alerts");
   const [values, setValues] = useState<Record<string, string>>({});
   const [originalValues, setOriginalValues] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    api
-      .getSettings()
-      .then((res) => {
-        setValues(res.data);
-        setOriginalValues(res.data);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    let cancelled = false;
+
+    const loadSettings = async () => {
+      try {
+        const response = await api.getSettings();
+        if (!cancelled) {
+          setValues(response.data);
+          setOriginalValues(response.data);
+          setError("");
+        }
+      } catch (settingsError) {
+        if (!cancelled) {
+          setError(settingsError instanceof Error ? settingsError.message : "Unable to load settings.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadSettings();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const hasChanges = JSON.stringify(values) !== JSON.stringify(originalValues);
+  const hasChanges = useMemo(
+    () => JSON.stringify(values) !== JSON.stringify(originalValues),
+    [originalValues, values],
+  );
+
+  const currentDefinitions = SETTING_DEFINITIONS.filter((definition) => definition.tab === tab);
+
+  const updateValue = (key: string, value: string) => {
+    setValues((current) => ({
+      ...current,
+      [key]: value,
+    }));
+  };
 
   const handleSave = async () => {
     setSaving(true);
-    setSaved(false);
     try {
-      const changed: Record<string, string> = {};
-      for (const key of Object.keys(values)) {
-        if (values[key] !== originalValues[key]) {
-          changed[key] = values[key];
-        }
-      }
-      await api.updateSettings(changed);
-      setOriginalValues({ ...values });
+      const changes = Object.fromEntries(
+        Object.entries(values).filter(([key, value]) => originalValues[key] !== value),
+      );
+      await api.updateSettings(changes);
+      setOriginalValues(values);
       setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
-    } catch (e) {
-      console.error(e);
+      setError("");
+      window.setTimeout(() => setSaved(false), 2200);
+    } catch (settingsError) {
+      setError(settingsError instanceof Error ? settingsError.message : "Unable to save settings.");
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
-
-  const handleReset = () => {
-    setValues({ ...originalValues });
-  };
-
-  const groups = [...new Set(SETTING_DEFS.map((s) => s.group))];
 
   if (loading) {
-    return (
-      <div className="flex justify-center py-20">
-        <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <LoadingState label="Loading engine settings..." />;
   }
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-black text-white flex items-center gap-2">
-          <SettingsIcon className="text-gray-400" size={24} />
-          Settings
-        </h1>
-        <div className="flex gap-2">
-          {hasChanges && (
-            <button
-              onClick={handleReset}
-              className="flex items-center gap-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 px-4 py-2 rounded-lg text-sm transition-colors"
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Settings"
+        title="Tune the AlphaHunter engine with product-grade controls."
+        description="Settings are grouped around investor outcomes: alerting, signal logic, scan cadence, and web-intel pipeline behaviour."
+        actions={
+          <div className="flex flex-wrap items-center gap-3">
+            <SectionTabs
+              value={tab}
+              onChange={setTab}
+              tabs={[
+                { value: "alerts", label: "Alerts" },
+                { value: "signals", label: "Signals" },
+                { value: "scanner", label: "Scanner" },
+                { value: "pipeline", label: "Pipeline" },
+              ]}
+            />
+            <Button
+              variant="secondary"
+              onClick={() => setValues(originalValues)}
+              disabled={!hasChanges || saving}
             >
-              <RotateCcw size={14} />
+              <RotateCcw className="size-4" />
               Reset
-            </button>
-          )}
-          <button
-            onClick={handleSave}
-            disabled={!hasChanges || saving}
-            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-5 py-2 rounded-lg text-sm transition-all disabled:opacity-50"
-          >
-            <Save size={14} />
-            {saving ? "Saving..." : saved ? "Saved!" : "Save Changes"}
-          </button>
-        </div>
-      </div>
-
-      {groups.map((group) => (
-        <div
-          key={group}
-          className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden"
-        >
-          <div className="bg-gray-900 px-5 py-3 border-b border-gray-700">
-            <h2 className="text-sm font-bold text-gray-300 uppercase tracking-wider">
-              {group}
-            </h2>
+            </Button>
+            <Button onClick={() => void handleSave()} disabled={!hasChanges || saving}>
+              <Save className="size-4" />
+              {saving ? "Saving..." : saved ? "Saved" : "Save changes"}
+            </Button>
           </div>
-          <div className="divide-y divide-gray-700/50">
-            {SETTING_DEFS.filter((s) => s.group === group).map((def) => (
+        }
+      />
+
+      {error ? <ErrorState description={error} /> : null}
+
+      <Panel
+        title={
+          tab === "alerts"
+            ? "Alert rules"
+            : tab === "signals"
+              ? "Signal logic"
+              : tab === "scanner"
+                ? "Scanner cadence"
+                : "Pipeline controls"
+        }
+        subtitle="Each control writes directly to the runtime settings store used by the backend."
+      >
+        <div className="space-y-4">
+          {currentDefinitions.map((definition) => {
+            const value = values[definition.key] ?? "";
+
+            return (
               <div
-                key={def.key}
-                className="px-5 py-4 flex items-center justify-between gap-4"
+                key={definition.key}
+                className="grid gap-4 rounded-[28px] border border-white/8 bg-slate-950/55 p-5 lg:grid-cols-[1.2fr_1fr]"
               >
-                <div className="flex-1">
-                  <label className="text-white font-medium text-sm">
-                    {def.label}
-                  </label>
-                  <p className="text-gray-500 text-xs mt-0.5">
-                    {def.description}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type={def.type}
-                    value={values[def.key] || ""}
-                    onChange={(e) =>
-                      setValues((prev) => ({
-                        ...prev,
-                        [def.key]: e.target.value,
-                      }))
-                    }
-                    className="w-24 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm font-mono text-right focus:outline-none focus:border-blue-500"
-                  />
-                  {def.unit && (
-                    <span className="text-gray-500 text-xs w-8">
-                      {def.unit}
-                    </span>
-                  )}
+                <FieldLabel label={definition.label} hint={definition.description} />
+
+                <div className="space-y-3">
+                  {definition.kind === "range" ? (
+                    <div className="rounded-[24px] border border-white/8 bg-slate-950/90 px-4 py-4">
+                      <input
+                        type="range"
+                        min={definition.min}
+                        max={definition.max}
+                        step={definition.step}
+                        value={Number(value || definition.min || 0)}
+                        onChange={(event) => updateValue(definition.key, event.target.value)}
+                        className="w-full accent-cyan-300"
+                      />
+                      <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
+                        <span>
+                          {definition.min}
+                          {definition.unit}
+                        </span>
+                        <span className="text-sm font-medium text-white">
+                          {value}
+                          {definition.unit}
+                        </span>
+                        <span>
+                          {definition.max}
+                          {definition.unit}
+                        </span>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {definition.kind === "select" ? (
+                    <select
+                      value={value}
+                      onChange={(event) => updateValue(definition.key, event.target.value)}
+                      className="terminal-select"
+                    >
+                      {definition.options?.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                          {definition.unit ? ` ${definition.unit}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  ) : null}
+
+                  {definition.kind === "number" ? (
+                    <input
+                      type="number"
+                      value={value}
+                      onChange={(event) => updateValue(definition.key, event.target.value)}
+                      className="terminal-input"
+                    />
+                  ) : null}
+
+                  {definition.kind === "toggle" ? (
+                    <button
+                      type="button"
+                      onClick={() => updateValue(definition.key, value === "true" ? "false" : "true")}
+                      className={`flex items-center justify-between rounded-[24px] border px-4 py-3 ${
+                        value === "true"
+                          ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-100"
+                          : "border-white/8 bg-slate-950/80 text-slate-300"
+                      }`}
+                    >
+                      <span className="text-sm font-medium">{value === "true" ? "Enabled" : "Disabled"}</span>
+                      <span className="rounded-full border border-current px-3 py-1 text-xs uppercase tracking-[0.18em]">
+                        {value === "true" ? "On" : "Off"}
+                      </span>
+                    </button>
+                  ) : null}
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
-      ))}
+      </Panel>
     </div>
   );
 }

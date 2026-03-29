@@ -1,3 +1,10 @@
+"""ScanRun — metadata record for one full pipeline execution.
+
+triggered_by: manual | scheduler.
+status: running | completed | failed.
+duration_secs is derived from completed_at - started_at and stored for
+quick dashboard display without recalculation.
+"""
 from sqlalchemy import Column, Integer, String, Boolean, Numeric, DateTime, Text, text, Index, Uuid
 from .base import Base
 import datetime

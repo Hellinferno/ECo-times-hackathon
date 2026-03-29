@@ -1,3 +1,9 @@
+"""WatchlistItem — single-user watchlist entry.
+
+user_id defaults to "default" for the single-user MVP; will become a FK to
+platform_users when multi-user auth is enabled.
+The (user_id, symbol) unique constraint prevents duplicate additions.
+"""
 from sqlalchemy import Column, Integer, String, Text, DateTime, UniqueConstraint, Index
 from .base import Base
 import datetime

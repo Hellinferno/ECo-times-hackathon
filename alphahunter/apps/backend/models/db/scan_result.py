@@ -1,3 +1,14 @@
+"""ScanResult — per-stock output of a single scan run iteration.
+
+One row per (scan_run, symbol) pair — enforced by the uq_scan_result constraint.
+
+Signal columns: breakout_triggered, volume_spike_triggered, bulk_deal_triggered
+  plus extra_signals_json for the 4 enrichment signals.
+composite_score (0–1) is the weighted blend used by the decision engine.
+reasoning_text is the raw JSON string returned by ReasoningAgent (llm_summary +
+  key_factors); parsed at read time by api/presenters.py.
+backtest_* columns are populated by BacktestingAgent.
+"""
 from sqlalchemy import Column, Integer, String, Boolean, Numeric, DateTime, Text, ForeignKey, BigInteger, UniqueConstraint, Index, JSON
 from .base import Base
 import datetime

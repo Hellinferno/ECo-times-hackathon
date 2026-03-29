@@ -1,3 +1,14 @@
+"""Unit tests for TinyFishProvider SSE parsing and error handling.
+
+Tests:
+  test_tinyfish_provider_parses_sse_payload
+    Verifies that a valid SSE stream with a JSON events array is parsed into
+    NormalizedSignalEvent objects with correct symbol, event_type, and Decimal fields.
+
+  test_tinyfish_provider_handles_invalid_payload
+    Verifies that non-JSON SSE lines and a non-JSON plain response both
+    produce an empty event list (no exception raised).
+"""
 from decimal import Decimal
 
 import requests

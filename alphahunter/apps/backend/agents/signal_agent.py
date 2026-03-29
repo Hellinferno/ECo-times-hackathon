@@ -1,3 +1,21 @@
+"""SignalAgent — multi-factor signal detector for a single stock.
+
+Evaluates three core signals (breakout, volume spike, bulk deal) plus four
+optional enrichment signals (news sentiment, social sentiment, insider filing,
+macro context) that activate when external context is supplied.
+
+Pipeline modes
+--------------
+  legacy  — core 3 signals only, composite score from those
+  shadow  — both legacy and grouped composite computed for A/B diffing
+  active  — grouped 7-signal composite is the production score
+
+Public API
+----------
+  SignalAgent.detect_signals(market_data, bulk_deals, external_context, mode)
+      → signal_data dict with signal_count, composite_score, and per-signal
+        triggered/details/strength fields
+"""
 import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -32,25 +50,43 @@ class SignalAgent:
         volume_today = market_data["volume_today"]
         ohlcv = market_data["ohlcv_short"]
 
+        closes = [day["close"] for day in ohlcv]
+
         breakout_sig, breakout_det = self._detect_breakout(current_price, ohlcv)
         volume_sig, volume_det = self._detect_volume_spike(volume_today, ohlcv)
         bulk_sig, bulk_det = self._detect_bulk_deals(bulk_deals, current_price)
+        rsi_sig, rsi_det = self._detect_rsi(closes)
+        macd_sig, macd_det = self._detect_macd(closes)
 
         news_sig, news_det, news_available = self._detect_news_sentiment(external_context)
         social_sig, social_det, social_available = self._detect_social_sentiment(external_context)
         insider_sig, insider_det, insider_available = self._detect_insider_filing(external_context)
         macro_sig, macro_det, macro_available = self._detect_macro_context(external_context)
 
-        legacy_signal_count = sum([breakout_sig, volume_sig, bulk_sig])
+        # Core 5-signal count (always available — no external API dependency)
+        legacy_signal_count = sum([breakout_sig, volume_sig, bulk_sig, rsi_sig, macd_sig])
         b_strength = breakout_det.get("strength", 0.0) if breakout_sig else 0.0
         v_strength = volume_det.get("strength", 0.0) if volume_sig else 0.0
         bulk_strength = bulk_det.get("strength", 0.0) if bulk_sig else 0.0
-        legacy_composite = round((b_strength * 0.45) + (v_strength * 0.35) + (bulk_strength * 0.20), 4)
+        rsi_strength = rsi_det.get("strength", 0.0) if rsi_sig else 0.0
+        macd_strength = macd_det.get("strength", 0.0) if macd_sig else 0.0
+
+        # Updated legacy composite: 5 core signals (breakout 35%, volume 25%, bulk 15%, RSI 15%, MACD 10%)
+        legacy_composite = round(
+            (b_strength * 0.35)
+            + (v_strength * 0.25)
+            + (bulk_strength * 0.15)
+            + (rsi_strength * 0.15)
+            + (macd_strength * 0.10),
+            4,
+        )
 
         technical_score = self._weighted_average(
             [
-                {"available": True, "weight": 0.55, "strength": b_strength},
-                {"available": True, "weight": 0.45, "strength": v_strength},
+                {"available": True, "weight": 0.40, "strength": b_strength},
+                {"available": True, "weight": 0.30, "strength": v_strength},
+                {"available": True, "weight": 0.20, "strength": rsi_strength},
+                {"available": True, "weight": 0.10, "strength": macd_strength},
             ]
         )
         institutional_score = self._weighted_average(
@@ -94,6 +130,8 @@ class SignalAgent:
                 breakout_sig,
                 volume_sig,
                 bulk_sig,
+                rsi_sig,
+                macd_sig,
                 news_sig if news_available else False,
                 social_sig if social_available else False,
                 insider_sig if insider_available else False,
@@ -102,12 +140,22 @@ class SignalAgent:
         )
         if mode_effective == "active":
             signal_count = extended_signal_count
-            max_signal_count = 7
+            max_signal_count = 9
         else:
             signal_count = legacy_signal_count
-            max_signal_count = 3
+            max_signal_count = 5
 
         extra_signals = {
+            "rsi": {
+                "triggered": rsi_sig,
+                "available": rsi_det.get("rsi") is not None,
+                **rsi_det,
+            },
+            "macd": {
+                "triggered": macd_sig,
+                "available": macd_det.get("macd") is not None,
+                **macd_det,
+            },
             "news_sentiment": {
                 "triggered": news_sig,
                 "available": news_available,
@@ -141,6 +189,8 @@ class SignalAgent:
                 "sentiment_macro": sentiment_macro_score,
             },
             "data_availability": {
+                "rsi": rsi_det.get("rsi") is not None,
+                "macd": macd_det.get("macd") is not None,
                 "news_sentiment": news_available,
                 "social_sentiment": social_available,
                 "insider_filing": insider_available,
@@ -156,6 +206,10 @@ class SignalAgent:
             "volume_spike_details": volume_det,
             "bulk_deal_triggered": bulk_sig,
             "bulk_deal_details": bulk_det,
+            "rsi_triggered": rsi_sig,
+            "rsi_details": rsi_det,
+            "macd_triggered": macd_sig,
+            "macd_details": macd_det,
             "news_sentiment_triggered": news_sig,
             "social_sentiment_triggered": social_sig,
             "insider_filing_triggered": insider_sig,
@@ -252,6 +306,109 @@ class SignalAgent:
             "lookback_days": self.bulk_deal_lookback_days,
         }
         return True, details
+
+    def _detect_rsi(self, closes: list, period: int = 14) -> Tuple[bool, Dict[str, Any]]:
+        """
+        RSI (14-period). Triggered when RSI < 45 (recovering/oversold zone).
+        Below 30 is strongly oversold; 30-45 is mildly oversold — both are bullish.
+        Returns strength 0-1 inversely scaled from 45 down to 20 (lower RSI = higher strength).
+        """
+        if len(closes) < period + 1:
+            return False, {"error": "Insufficient data", "rsi": None, "strength": 0.0}
+
+        deltas = [closes[i] - closes[i - 1] for i in range(1, len(closes))]
+        gains = [max(d, 0.0) for d in deltas]
+        losses = [max(-d, 0.0) for d in deltas]
+
+        # Initial averages
+        avg_gain = sum(gains[:period]) / period
+        avg_loss = sum(losses[:period]) / period
+
+        # Smoothed Wilder moving average for remaining points
+        for i in range(period, len(gains)):
+            avg_gain = (avg_gain * (period - 1) + gains[i]) / period
+            avg_loss = (avg_loss * (period - 1) + losses[i]) / period
+
+        if avg_loss == 0:
+            rsi = 100.0
+        else:
+            rs = avg_gain / avg_loss
+            rsi = 100.0 - (100.0 / (1.0 + rs))
+
+        triggered = rsi < 45.0
+        strength = 0.0
+        if triggered:
+            # Strength scales from 0 at RSI=45 to 1.0 at RSI=20
+            strength = min(max((45.0 - rsi) / 25.0, 0.0), 1.0)
+
+        return triggered, {
+            "rsi": round(rsi, 2),
+            "threshold": 45.0,
+            "period": period,
+            "strength": round(strength, 4),
+            "interpretation": (
+                "Strongly oversold" if rsi < 30 else
+                "Mildly oversold / recovering" if rsi < 45 else
+                "Neutral" if rsi < 70 else "Overbought"
+            ),
+        }
+
+    def _detect_macd(self, closes: list, fast: int = 12, slow: int = 26, signal: int = 9) -> Tuple[bool, Dict[str, Any]]:
+        """
+        MACD (12/26/9). Triggered on bullish crossover: MACD line crosses above Signal line
+        within the last 3 bars, or MACD > Signal and both are positive.
+        """
+        min_required = slow + signal
+        if len(closes) < min_required:
+            return False, {"error": "Insufficient data", "macd": None, "strength": 0.0}
+
+        def _ema(prices: list, period: int) -> list:
+            k = 2.0 / (period + 1)
+            ema = [prices[0]]
+            for price in prices[1:]:
+                ema.append(price * k + ema[-1] * (1 - k))
+            return ema
+
+        ema_fast = _ema(closes, fast)
+        ema_slow = _ema(closes, slow)
+
+        # MACD line (only valid from index `slow-1` onward)
+        macd_line = [ema_fast[i] - ema_slow[i] for i in range(len(ema_slow))]
+
+        # Signal line: EMA of macd_line starting from index slow-1
+        macd_valid = macd_line[slow - 1:]
+        signal_line = _ema(macd_valid, signal)
+
+        # Current values (last element)
+        current_macd = macd_valid[-1]
+        current_signal = signal_line[-1]
+        histogram = current_macd - current_signal
+
+        # Detect bullish crossover in last 3 bars
+        crossover_bars = min(3, len(macd_valid) - 1)
+        crossover = any(
+            macd_valid[-(i + 2)] <= signal_line[-(i + 2)] and
+            macd_valid[-(i + 1)] > signal_line[-(i + 1)]
+            for i in range(crossover_bars)
+            if (i + 2) <= len(signal_line)
+        )
+
+        triggered = crossover or (current_macd > current_signal and current_macd > 0)
+        strength = 0.0
+        if triggered:
+            # Strength from histogram magnitude relative to recent price (normalised)
+            ref_price = abs(closes[-1]) if closes[-1] != 0 else 1.0
+            strength = min(abs(histogram) / (ref_price * 0.01), 1.0)  # 1% of price as reference
+            if crossover:
+                strength = max(strength, 0.4)  # crossover gets minimum 0.4 strength
+
+        return triggered, {
+            "macd": round(current_macd, 4),
+            "signal": round(current_signal, 4),
+            "histogram": round(histogram, 4),
+            "crossover": crossover,
+            "strength": round(strength, 4),
+        }
 
     def _detect_news_sentiment(
         self, external_context: Optional[Dict[str, Any]]

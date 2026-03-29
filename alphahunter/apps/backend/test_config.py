@@ -20,7 +20,14 @@ def test_settings_prefer_hosted_urls(monkeypatch):
         "https://alphahunter.app",
     ]
     assert settings.allowed_origin_regex is not None
+    # Legitimate single-segment subdomain must match
     assert re.match(settings.allowed_origin_regex, "https://preview-123.vercel.app")
+    # Completely unrelated domain must not match
+    assert not re.match(settings.allowed_origin_regex, "https://evil.other.app")
+    # Trailing domain suffix attack must not match
+    assert not re.match(settings.allowed_origin_regex, "https://preview-123.vercel.app.evil.com")
+    # Multi-segment subdomain attack must not match (was vulnerable with [^/]+)
+    assert not re.match(settings.allowed_origin_regex, "https://deep.sub.vercel.app")
 
 
 def test_settings_keep_local_dev_fallbacks(monkeypatch):

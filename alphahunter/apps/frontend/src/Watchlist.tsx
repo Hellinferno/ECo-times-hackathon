@@ -1,182 +1,173 @@
-import { useState, useEffect } from "react";
+/**
+ * Watchlist — tracked NSE names sorted by live signal heat.
+ *
+ * Sections:
+ *   PageHeader      — title and description
+ *   Metrics grid    — tracked count, active signals, highest conviction, latest update (4-up)
+ *   Add a stock     — symbol input + add button (enforces 20-name server cap)
+ *   Tracked names   — 2-col grid of watchlist item cards with remove action
+ *
+ * Sort order: names with active signals first, then by descending confidence.
+ */
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "./api/client";
-import type { WatchlistEntry } from "./api/client";
-import { Star, Trash2, Plus, ExternalLink } from "lucide-react";
+import { ArrowUpRight, Plus, Trash2 } from "lucide-react";
+import { api, type WatchlistEntry } from "./api/client";
+import { useApiLoad } from "./hooks/useApiLoad";
+import {
+  Button,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  MetricCard,
+  PageHeader,
+  Panel,
+  StatusBadge,
+} from "./components/ui";
+import { formatDateTime, formatPercent } from "./lib/format";
 
 export default function Watchlist() {
-  const [items, setItems] = useState<WatchlistEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [addSymbol, setAddSymbol] = useState("");
+  const [symbol, setSymbol] = useState("");
   const [adding, setAdding] = useState(false);
-  const [error, setError] = useState("");
+  const [mutationError, setMutationError] = useState("");
 
-  const fetchWatchlist = () => {
-    api
-      .getWatchlist()
-      .then((res) => setItems(res.data))
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  };
+  const { data: watchlist, loading, error: loadError, refresh } = useApiLoad(
+    () => api.getWatchlist(),
+    [],
+  );
+  const error = loadError || mutationError;
 
-  useEffect(() => {
-    fetchWatchlist();
-  }, []);
+  const sortedItems = useMemo(() => {
+    if (!watchlist) return [];
+    return [...watchlist.items].sort((left, right) => {
+      if (left.has_active_signal !== right.has_active_signal) {
+        return left.has_active_signal ? -1 : 1;
+      }
+      return (right.latest_confidence ?? 0) - (left.latest_confidence ?? 0);
+    });
+  }, [watchlist]);
 
   const handleAdd = async () => {
-    if (!addSymbol.trim()) return;
+    if (!symbol.trim()) return;
     setAdding(true);
-    setError("");
     try {
-      await api.addToWatchlist(addSymbol.trim());
-      setAddSymbol("");
-      fetchWatchlist();
-    } catch (e: any) {
-      setError(e.message);
+      await api.addToWatchlist(symbol.trim().toUpperCase());
+      setSymbol("");
+      setMutationError("");
+      refresh();
+    } catch (watchlistError) {
+      setMutationError(watchlistError instanceof Error ? watchlistError.message : "Unable to add stock.");
+    } finally {
+      setAdding(false);
     }
-    setAdding(false);
   };
 
-  const handleRemove = async (symbol: string) => {
+  const handleRemove = async (item: WatchlistEntry) => {
     try {
-      await api.removeFromWatchlist(symbol);
-      setItems((prev) => prev.filter((i) => i.symbol !== symbol));
-    } catch (e: any) {
-      console.error(e);
+      await api.removeFromWatchlist(item.symbol);
+      setMutationError("");
+      refresh();
+    } catch (watchlistError) {
+      setMutationError(watchlistError instanceof Error ? watchlistError.message : "Unable to remove stock.");
     }
   };
+
+  if (loading) {
+    return <LoadingState label="Loading watchlist..." />;
+  }
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-black text-white flex items-center gap-2">
-          <Star className="text-yellow-400" size={24} />
-          Watchlist
-        </h1>
-        <span className="text-sm bg-gray-700 px-3 py-1 rounded-full text-gray-300 font-mono">
-          {items.length} stocks
-        </span>
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Watchlist"
+        title="Track the names that deserve immediate attention."
+        description="Pin up to twenty NSE names and sort them by live signal heat so your highest-priority ideas stay on top."
+      />
+
+      {error ? <ErrorState description={error} /> : null}
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="Tracked names" value={watchlist?.count ?? 0} detail={`of ${watchlist?.max_items ?? 20} max slots`} />
+        <MetricCard label="Active signals" value={sortedItems.filter((item) => item.has_active_signal).length} detail="Names currently showing live signal activity." tone="positive" />
+        <MetricCard label="Highest conviction" value={formatPercent(sortedItems[0]?.latest_confidence)} detail={sortedItems[0] ? `${sortedItems[0].symbol} leads the board.` : "Awaiting first tracked signal."} tone="warning" />
+        <MetricCard label="Latest update" value={sortedItems[0]?.last_scanned_at ? formatDateTime(sortedItems[0].last_scanned_at) : "NA"} detail="Most recent scan time among tracked names." />
       </div>
 
-      {/* Add stock form */}
-      <div className="bg-gray-800 p-4 rounded-xl border border-gray-700 flex gap-3">
-        <input
-          type="text"
-          value={addSymbol}
-          onChange={(e) => setAddSymbol(e.target.value.toUpperCase())}
-          onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-          placeholder="Enter stock symbol (e.g., INFY)"
-          className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
-        />
-        <button
-          onClick={handleAdd}
-          disabled={adding || !addSymbol.trim()}
-          className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-5 py-2.5 rounded-lg transition-all disabled:opacity-50"
-        >
-          <Plus size={18} />
-          Add
-        </button>
-      </div>
-      {error && <p className="text-red-400 text-sm">{error}</p>}
+      <Panel title="Add a stock" subtitle="The watchlist is single-user for this phase and capped at twenty names.">
+        <div className="grid gap-4 lg:grid-cols-[1.2fr_auto]">
+          <label className="space-y-2">
+            <span className="text-sm font-medium text-white">Stock symbol</span>
+            <input
+              value={symbol}
+              onChange={(event) => setSymbol(event.target.value.toUpperCase())}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  void handleAdd();
+                }
+              }}
+              className="terminal-input"
+              placeholder="INFY"
+            />
+          </label>
+          <div className="flex items-end">
+            <Button onClick={() => void handleAdd()} disabled={adding || !symbol.trim()} className="w-full lg:w-auto">
+              <Plus className="size-4" />
+              {adding ? "Adding..." : "Add to watchlist"}
+            </Button>
+          </div>
+        </div>
+      </Panel>
 
-      {/* Watchlist table */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-        {loading ? (
-          <div className="flex justify-center py-10">
-            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : items.length === 0 ? (
-          <div className="text-center py-16 text-gray-400">
-            <Star size={40} className="mx-auto mb-3 opacity-30" />
-            <p className="font-medium">Your watchlist is empty</p>
-            <p className="text-sm mt-1">
-              Add stocks above to track them
-            </p>
-          </div>
+      <Panel title="Tracked names" subtitle="Active signals float to the top so the board behaves like a true investor command list.">
+        {sortedItems.length === 0 ? (
+          <EmptyState
+            title="Your watchlist is empty"
+            description="Add a few names to start tracking live signal heat, confidence, and last scan recency."
+          />
         ) : (
-          <table className="w-full text-left text-sm">
-            <thead className="bg-gray-900 text-gray-400 uppercase text-xs">
-              <tr>
-                <th className="px-5 py-3">Symbol</th>
-                <th className="px-5 py-3">Latest Action</th>
-                <th className="px-5 py-3">Confidence</th>
-                <th className="px-5 py-3">Last Analyzed</th>
-                <th className="px-5 py-3">Added</th>
-                <th className="px-5 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <tr
-                  key={item.id}
-                  className="border-t border-gray-700/50 hover:bg-gray-700/30 transition-colors"
-                >
-                  <td className="px-5 py-4">
-                    <Link
-                      to={`/stock/${item.symbol}`}
-                      className="font-bold text-white hover:text-blue-400 transition-colors"
-                    >
-                      {item.symbol}
-                    </Link>
-                  </td>
-                  <td className="px-5 py-4">
-                    {item.latest_action ? (
-                      <span
-                        className={`px-2 py-0.5 text-xs font-bold rounded ${
-                          item.latest_action === "BUY"
-                            ? "bg-green-900/50 text-green-400"
-                            : item.latest_action === "WATCH"
-                            ? "bg-yellow-900/50 text-yellow-400"
-                            : "bg-red-900/50 text-red-400"
-                        }`}
-                      >
-                        {item.latest_action}
-                      </span>
-                    ) : (
-                      <span className="text-gray-500">-</span>
-                    )}
-                  </td>
-                  <td className="px-5 py-4 font-mono">
-                    {item.latest_confidence != null ? (
-                      <span className="text-blue-400">
-                        {item.latest_confidence}%
-                      </span>
-                    ) : (
-                      <span className="text-gray-500">-</span>
-                    )}
-                  </td>
-                  <td className="px-5 py-4 text-gray-400 text-xs">
-                    {item.latest_decided_at
-                      ? new Date(item.latest_decided_at).toLocaleString()
-                      : "-"}
-                  </td>
-                  <td className="px-5 py-4 text-gray-400 text-xs">
-                    {new Date(item.added_at).toLocaleDateString()}
-                  </td>
-                  <td className="px-5 py-4 text-right">
-                    <div className="flex items-center gap-2 justify-end">
-                      <Link
-                        to={`/stock/${item.symbol}`}
-                        className="text-gray-400 hover:text-blue-400 transition-colors p-1"
-                        title="View detail"
-                      >
-                        <ExternalLink size={16} />
-                      </Link>
-                      <button
-                        onClick={() => handleRemove(item.symbol)}
-                        className="text-gray-400 hover:text-red-400 transition-colors p-1"
-                        title="Remove"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="grid gap-4 xl:grid-cols-2">
+            {sortedItems.map((item) => (
+              <article
+                key={item.id}
+                className="rounded-[28px] border border-white/8 bg-slate-950/60 p-5 transition hover:border-cyan-400/30"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{item.name}</p>
+                    <h3 className="mt-2 text-2xl font-semibold text-white">{item.symbol}</h3>
+                    <p className="mt-1 text-sm text-slate-400">{item.sector ?? "NSE coverage"}</p>
+                  </div>
+                  <StatusBadge label={item.latest_action ?? "idle"} tone={item.has_active_signal ? "positive" : "neutral"} />
+                </div>
+
+                <div className="mt-5 grid gap-3 md:grid-cols-3">
+                  <MetricCard label="Confidence" value={formatPercent(item.latest_confidence)} detail="Latest decision score." />
+                  <MetricCard label="Signals" value={item.latest_signal_count} detail="Triggered factors in the last scan." tone="warning" />
+                  <MetricCard label="Last scan" value={item.last_scanned_at ? formatDateTime(item.last_scanned_at) : "NA"} detail="Refresh recency." />
+                </div>
+
+                <div className="mt-6 flex items-center justify-between">
+                  <Link
+                    to={`/stock/${item.symbol}`}
+                    className="inline-flex items-center gap-2 text-sm font-medium text-cyan-200 hover:text-white"
+                  >
+                    Open stock detail
+                    <ArrowUpRight className="size-4" />
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => void handleRemove(item)}
+                    className="inline-flex items-center gap-2 rounded-full border border-rose-500/20 px-3 py-1.5 text-sm text-rose-200 hover:bg-rose-500/8"
+                  >
+                    <Trash2 className="size-4" />
+                    Remove
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
         )}
-      </div>
+      </Panel>
     </div>
   );
 }

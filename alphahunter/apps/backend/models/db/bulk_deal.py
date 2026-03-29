@@ -1,3 +1,9 @@
+"""BulkDeal — institutional bulk/block deal record from NSE/BSE.
+
+deal_type: BUY | SELL.
+A unique constraint on (symbol, deal_date, client_name, deal_type) prevents
+duplicate imports when the same day's data is fetched more than once.
+"""
 from sqlalchemy import Column, Integer, String, Date, Numeric, BigInteger, DateTime, UniqueConstraint, Index
 from .base import Base
 import datetime

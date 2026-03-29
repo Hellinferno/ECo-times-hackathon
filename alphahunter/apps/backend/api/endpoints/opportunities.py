@@ -1,115 +1,159 @@
-from fastapi import APIRouter, Depends, Query, HTTPException
-from sqlalchemy.orm import Session
-from database import get_db
-from models.db import Decision, ScanResult
+"""Opportunities endpoint — ranked trade recommendations from the latest scan run.
+
+Routes:
+  GET  ""              Paginated list filtered by action / signal / min_confidence
+  GET  /{decision_id}  Full detail for one decision including pipeline snapshot
+
+The "reference scan run" is the most-recent completed run; falls back to the
+most-recent run of any status when no completed run exists yet.
+"""
+from __future__ import annotations
+
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import desc
-import json
+from sqlalchemy.orm import Session
+
+from api.presenters import serialize_opportunity
+from database import get_db
+from models.db import Decision, ScanResult, ScanRun, Stock
 
 router = APIRouter()
 
-@router.get("")
-def list_opportunities(limit: int = Query(20, le=100), db: Session = Depends(get_db)):
-    """Fetch actionable pipeline conclusions mappings to BUY/WATCH parameters."""
+# ── Query helpers ─────────────────────────────────────────────────────────────
 
-    # Subquery / Joining
-    decisions = (
-        db.query(Decision, ScanResult)
+SIGNAL_FILTERS = {
+    "breakout": ScanResult.breakout_triggered.is_(True),
+    "volume_spike": ScanResult.volume_spike_triggered.is_(True),
+    "bulk_deal": ScanResult.bulk_deal_triggered.is_(True),
+}
+
+
+# ── Routes ────────────────────────────────────────────────────────────────────
+
+
+def get_reference_scan_run(db: Session) -> ScanRun | None:
+    latest_completed = (
+        db.query(ScanRun)
+        .filter(ScanRun.status == "completed")
+        .order_by(desc(ScanRun.completed_at), desc(ScanRun.started_at))
+        .first()
+    )
+    if latest_completed:
+        return latest_completed
+
+    return db.query(ScanRun).order_by(desc(ScanRun.started_at)).first()
+
+
+@router.get("/sectors")
+def list_sectors(db: Session = Depends(get_db)):
+    """Return distinct non-null sectors present in the active stock universe."""
+    rows = (
+        db.query(Stock.sector)
+        .filter(Stock.sector.isnot(None), Stock.is_active.is_(True))
+        .distinct()
+        .order_by(Stock.sector)
+        .all()
+    )
+    return {"success": True, "data": [row[0] for row in rows]}
+
+
+@router.get("")
+def list_opportunities(
+    action: str | None = Query(default=None, description="BUY, WATCH, or AVOID"),
+    signal: str | None = Query(default=None, description="breakout, volume_spike, bulk_deal"),
+    sector: str | None = Query(default=None, description="e.g. Technology, Financial Services"),
+    min_confidence: float = Query(default=0.0, ge=0.0, le=100.0),
+    limit: int = Query(default=20, le=100),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+):
+    """Fetch ranked current opportunities from the latest reference scan run."""
+
+    reference_run = get_reference_scan_run(db)
+    if not reference_run:
+        return {
+            "success": True,
+            "data": {
+                "scan_run_id": None,
+                "status": "idle",
+                "scanned_at": None,
+                "total": 0,
+                "opportunities": [],
+            },
+        }
+
+    base_query = (
+        db.query(Decision, ScanResult, Stock)
         .join(ScanResult, Decision.scan_result_id == ScanResult.id)
-        .order_by(desc(Decision.confidence))
+        .join(Stock, Stock.symbol == Decision.symbol)
+        .filter(ScanResult.scan_run_id == reference_run.id)
+    )
+
+    if action:
+        base_query = base_query.filter(Decision.action == action.upper())
+
+    if min_confidence > 0:
+        base_query = base_query.filter(Decision.confidence >= min_confidence)
+
+    if signal:
+        signal_clause = SIGNAL_FILTERS.get(signal)
+        if signal_clause is None:
+            raise HTTPException(status_code=400, detail="Unsupported signal filter")
+        base_query = base_query.filter(signal_clause)
+
+    if sector:
+        base_query = base_query.filter(Stock.sector == sector)
+
+    total = base_query.count()
+
+    rows = (
+        base_query.order_by(desc(Decision.confidence), desc(Decision.decided_at))
+        .offset(offset)
         .limit(limit)
         .all()
     )
 
-    payload = []
-    for d, result in decisions:
-        reason = result.reasoning_text if result else None
-        try:
-            parsed_reasoning = json.loads(reason) if reason else {}
-        except:
-            parsed_reasoning = {"llm_summary": reason}
-
-        signals = []
-        if result:
-            if result.breakout_triggered:
-                signals.append("breakout")
-            if result.volume_spike_triggered:
-                signals.append("volume_spike")
-            if result.bulk_deal_triggered:
-                signals.append("bulk_deal")
-            extras = result.extra_signals_json or {}
-            if extras.get("news_sentiment", {}).get("triggered"):
-                signals.append("news_sentiment")
-            if extras.get("social_sentiment", {}).get("triggered"):
-                signals.append("social_sentiment")
-            if extras.get("insider_filing", {}).get("triggered"):
-                signals.append("insider_filing")
-            if extras.get("macro_context", {}).get("triggered"):
-                signals.append("macro_context")
-
-        payload.append({
-            "decision_id": str(d.decision_id),
-            "symbol": d.symbol,
-            "action": d.action,
-            "confidence": d.confidence,
-            "entry_price": d.entry_price,
-            "target": d.target_price,
-            "stop_loss": d.stop_loss,
-            "rr_ratio": d.rr_ratio,
-            "signals": signals,
-            "reasoning": parsed_reasoning,
-            "timestamp": d.decided_at.isoformat()
-        })
-        
-    return {
-        "success": True,
-        "data": payload
-    }
-
-@router.get("/{decision_id}")
-def get_opportunity_detail(decision_id: str, db: Session = Depends(get_db)):
-    """Fetch complete detail, audit snapshot and data for a single opportunity."""
-    decision = db.query(Decision).filter(Decision.decision_id == decision_id).first()
-    if not decision:
-        raise HTTPException(status_code=404, detail="Opportunity not found")
-        
-    result = db.query(ScanResult).filter(ScanResult.id == decision.scan_result_id).first()
-
-    try:
-        parsed_reasoning = json.loads(result.reasoning_text) if result and result.reasoning_text else {}
-    except:
-        parsed_reasoning = {"llm_summary": result.reasoning_text if result else ""}
+    payload = [serialize_opportunity(decision, scan_result, stock) for decision, scan_result, stock in rows]
 
     return {
         "success": True,
         "data": {
-            "decision": {
-                "decision_id": str(decision.decision_id),
-                "symbol": decision.symbol,
-                "action": decision.action,
-                "confidence": decision.confidence,
-                "entry_price": decision.entry_price,
-                "target": decision.target_price,
-                "stop_loss": decision.stop_loss,
-                "rr_ratio": decision.rr_ratio,
-                "score_signal": decision.score_signal,
-                "score_backtest": decision.score_backtest,
-                "score_composite": decision.score_composite,
-                "timestamp": decision.decided_at.isoformat(),
-                "snapshot": decision.snapshot_json
-            },
-            "signals": {
-                "breakout": result.breakout_triggered if result else False,
-                "volume": result.volume_spike_triggered if result else False,
-                "bulk": result.bulk_deal_triggered if result else False,
-                "news_sentiment": (result.extra_signals_json or {}).get("news_sentiment", {}) if result else {},
-                "social_sentiment": (result.extra_signals_json or {}).get("social_sentiment", {}) if result else {},
-                "insider_filing": (result.extra_signals_json or {}).get("insider_filing", {}) if result else {},
-                "macro_context": (result.extra_signals_json or {}).get("macro_context", {}) if result else {},
-                "breakout_details": json.loads(result.breakout_details) if result and isinstance(result.breakout_details, str) else (result.breakout_details if result else {}),
-                "volume_details": json.loads(result.volume_spike_details) if result and isinstance(result.volume_spike_details, str) else (result.volume_spike_details if result else {}),
-                "bulk_details": json.loads(result.bulk_deal_details) if result and isinstance(result.bulk_deal_details, str) else (result.bulk_deal_details if result else {}),
-                "signal_diagnostics": result.data_quality_json if result else {},
-            },
-            "reasoning": parsed_reasoning
-        }
+            "scan_run_id": str(reference_run.run_id),
+            "status": reference_run.status,
+            "scanned_at": (
+                reference_run.completed_at.isoformat()
+                if reference_run.completed_at
+                else reference_run.started_at.isoformat()
+            ),
+            "total": total,
+            "opportunities": payload,
+        },
     }
+
+
+@router.get("/{decision_id}")
+def get_opportunity_detail(decision_id: str, db: Session = Depends(get_db)):
+    """Fetch detailed current opportunity data for a single decision."""
+
+    try:
+        parsed_decision_id = UUID(decision_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid decision id") from exc
+
+    row = (
+        db.query(Decision, ScanResult, Stock)
+        .join(ScanResult, Decision.scan_result_id == ScanResult.id)
+        .join(Stock, Stock.symbol == Decision.symbol)
+        .filter(Decision.decision_id == parsed_decision_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Opportunity not found")
+
+    decision, scan_result, stock = row
+    opportunity = serialize_opportunity(decision, scan_result, stock)
+    opportunity["snapshot"] = decision.snapshot_json or {}
+
+    return {"success": True, "data": opportunity}

@@ -1,158 +1,163 @@
-import { useState, useEffect } from "react";
+/**
+ * Alerts — signal-triggered notification inbox.
+ *
+ * Sections:
+ *   PageHeader     — title, read/unread filter tabs, mark-all-read, clear-read CTAs
+ *   Metrics grid   — unread count, read count, visible count, latest confidence (4-up)
+ *   Alert stream   — scrollable list of alert cards with drill-through to stock detail
+ *
+ * Actions:
+ *   Mark all read  — POST /api/alerts/read-all then refresh
+ *   Clear read     — DELETE /api/alerts/read then refresh
+ */
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "./api/client";
-import type { AlertEntry } from "./api/client";
-import { Bell, CheckCheck, Eye } from "lucide-react";
+import { Bell, CheckCheck, Trash2 } from "lucide-react";
+import { api, type AlertEntry } from "./api/client";
+import { useApiLoad } from "./hooks/useApiLoad";
+import {
+  Button,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  MetricCard,
+  PageHeader,
+  Panel,
+  StatusBadge,
+} from "./components/ui";
+import { formatDateTime, formatPercent, getActionTone } from "./lib/format";
+
+type AlertFilter = "all" | "unread";
 
 export default function Alerts() {
-  const [alerts, setAlerts] = useState<AlertEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"all" | "unread">("all");
+  const [filter, setFilter] = useState<AlertFilter>("all");
+  const [mutationError, setMutationError] = useState("");
 
-  const fetchAlerts = (unreadOnly: boolean) => {
-    setLoading(true);
-    api
-      .getAlerts(unreadOnly)
-      .then((res) => setAlerts(res.data))
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  };
+  const { data: alerts, loading, error: loadError, refresh } = useApiLoad(
+    () => api.getAlerts({ unread_only: filter === "unread", limit: 80 }),
+    [filter],
+  );
+  const error = loadError || mutationError;
 
-  useEffect(() => {
-    fetchAlerts(filter === "unread");
-  }, [filter]);
+  const readCount = useMemo(() => alerts?.alerts.filter((alert) => alert.is_read).length ?? 0, [alerts]);
 
   const markAllRead = async () => {
     try {
       await api.markAlertsRead();
-      setAlerts((prev) => prev.map((a) => ({ ...a, is_read: true })));
-    } catch (e) {
-      console.error(e);
+      refresh();
+      setMutationError("");
+    } catch (alertError) {
+      setMutationError(alertError instanceof Error ? alertError.message : "Unable to mark alerts as read.");
     }
   };
 
-  const unreadCount = alerts.filter((a) => !a.is_read).length;
+  const clearRead = async () => {
+    try {
+      await api.clearReadAlerts();
+      refresh();
+      setMutationError("");
+    } catch (alertError) {
+      setMutationError(alertError instanceof Error ? alertError.message : "Unable to clear read alerts.");
+    }
+  };
+
+  if (loading) {
+    return <LoadingState label="Loading alert center..." />;
+  }
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-black text-white flex items-center gap-2">
-          <Bell className="text-blue-400" size={24} />
-          Alerts
-          {unreadCount > 0 && (
-            <span className="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-              {unreadCount}
-            </span>
-          )}
-        </h1>
-        <div className="flex gap-2">
-          <div className="flex bg-gray-800 rounded-lg p-0.5 border border-gray-700">
-            <button
-              onClick={() => setFilter("all")}
-              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                filter === "all"
-                  ? "bg-gray-700 text-white"
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              All
-            </button>
-            <button
-              onClick={() => setFilter("unread")}
-              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                filter === "unread"
-                  ? "bg-gray-700 text-white"
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              Unread
-            </button>
-          </div>
-          {unreadCount > 0 && (
-            <button
-              onClick={markAllRead}
-              className="flex items-center gap-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 px-3 py-1.5 rounded-lg text-sm transition-colors"
-            >
-              <CheckCheck size={14} />
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Alert center"
+        title="Review timely alerts without losing context."
+        description="AlphaHunter keeps alert volume focused: unread count, mark-as-read controls, and direct drill-through into the matching stock detail."
+        actions={
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="inline-flex rounded-2xl border border-white/8 bg-slate-950/70 p-1">
+              <button
+                type="button"
+                onClick={() => setFilter("all")}
+                className={`rounded-2xl px-4 py-2 text-sm ${filter === "all" ? "bg-cyan-400/12 text-white" : "text-slate-400 hover:text-white"}`}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilter("unread")}
+                className={`rounded-2xl px-4 py-2 text-sm ${filter === "unread" ? "bg-cyan-400/12 text-white" : "text-slate-400 hover:text-white"}`}
+              >
+                Unread
+              </button>
+            </div>
+            <Button variant="secondary" onClick={() => void markAllRead()} disabled={!alerts?.unread_count}>
+              <CheckCheck className="size-4" />
               Mark all read
-            </button>
-          )}
-        </div>
+            </Button>
+            <Button variant="danger" onClick={() => void clearRead()} disabled={readCount === 0}>
+              <Trash2 className="size-4" />
+              Clear read
+            </Button>
+          </div>
+        }
+      />
+
+      {error ? <ErrorState description={error} /> : null}
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="Unread" value={alerts?.unread_count ?? 0} detail="Alerts still needing review." tone="warning" />
+        <MetricCard label="Read" value={readCount} detail="Already triaged in this inbox." />
+        <MetricCard label="Visible" value={alerts?.alerts.length ?? 0} detail={`Filter: ${filter}`} tone="positive" />
+        <MetricCard label="Latest confidence" value={formatPercent(alerts?.alerts[0]?.confidence)} detail={alerts?.alerts[0]?.symbol ? `${alerts.alerts[0].symbol} is the freshest alert.` : "No alert confidence available."} />
       </div>
 
-      <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-        {loading ? (
-          <div className="flex justify-center py-10">
-            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : alerts.length === 0 ? (
-          <div className="text-center py-16 text-gray-400">
-            <Bell size={40} className="mx-auto mb-3 opacity-30" />
-            <p className="font-medium">No alerts</p>
-            <p className="text-sm mt-1">
-              Alerts will appear here when the system detects opportunities
-            </p>
-          </div>
+      <Panel title="Alert stream" subtitle="Alerts stay compact, readable, and directly connected to the underlying stock detail.">
+        {!alerts?.alerts.length ? (
+          <EmptyState
+            title="No alerts in this view"
+            description="When the engine detects high-confidence activity, the alert center will show it here."
+          />
         ) : (
-          <div className="divide-y divide-gray-700/50">
-            {alerts.map((alert) => (
-              <div
+          <div className="space-y-3">
+            {alerts.alerts.map((alert: AlertEntry) => (
+              <article
                 key={alert.id}
-                className={`px-5 py-4 flex items-start gap-4 transition-colors ${
-                  alert.is_read ? "opacity-60" : "bg-gray-800"
+                className={`rounded-[28px] border p-5 transition ${
+                  alert.is_read
+                    ? "border-white/8 bg-slate-950/45"
+                    : "border-cyan-400/20 bg-cyan-400/6"
                 }`}
               >
-                <div
-                  className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${
-                    alert.is_read ? "bg-gray-600" : "bg-blue-500"
-                  }`}
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Link
-                      to={`/stock/${alert.symbol}`}
-                      className="font-bold text-white hover:text-blue-400 transition-colors"
-                    >
-                      {alert.symbol}
-                    </Link>
-                    {alert.action && (
-                      <span
-                        className={`px-2 py-0.5 text-xs font-bold rounded ${
-                          alert.action === "BUY"
-                            ? "bg-green-900/50 text-green-400"
-                            : alert.action === "WATCH"
-                            ? "bg-yellow-900/50 text-yellow-400"
-                            : "bg-red-900/50 text-red-400"
-                        }`}
-                      >
-                        {alert.action}
-                      </span>
-                    )}
-                    <span className="text-xs bg-gray-700 text-gray-400 px-2 py-0.5 rounded">
-                      {alert.alert_type}
-                    </span>
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Bell className="size-4 text-cyan-200" />
+                      <Link to={`/stock/${alert.symbol}`} className="text-lg font-semibold text-white hover:text-cyan-100">
+                        {alert.symbol}
+                      </Link>
+                      {alert.action ? (
+                        <StatusBadge
+                          label={alert.action}
+                          tone={getActionTone(alert.action)}
+                        />
+                      ) : null}
+                      <StatusBadge label={alert.is_read ? "Read" : "Unread"} tone={alert.is_read ? "neutral" : "info"} />
+                    </div>
+                    <p className="mt-3 text-sm text-slate-300">{alert.message}</p>
+                    <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                      <span>{formatDateTime(alert.created_at)}</span>
+                      <span>{alert.alert_type}</span>
+                      <span>{formatPercent(alert.confidence)}</span>
+                    </div>
                   </div>
-                  <p className="text-gray-300 text-sm">{alert.message}</p>
-                  <p className="text-gray-500 text-xs mt-1">
-                    {new Date(alert.created_at).toLocaleString()}
-                    {alert.confidence != null && (
-                      <span className="ml-2 text-blue-400">
-                        {alert.confidence}% confidence
-                      </span>
-                    )}
-                  </p>
+                  <Link to={`/stock/${alert.symbol}`}>
+                    <Button variant="ghost">Open detail</Button>
+                  </Link>
                 </div>
-                <Link
-                  to={`/stock/${alert.symbol}`}
-                  className="text-gray-400 hover:text-blue-400 transition-colors p-1 flex-shrink-0"
-                >
-                  <Eye size={16} />
-                </Link>
-              </div>
+              </article>
             ))}
           </div>
         )}
-      </div>
+      </Panel>
     </div>
   );
 }

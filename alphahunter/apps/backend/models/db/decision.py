@@ -1,3 +1,14 @@
+"""Decision — trade recommendation produced by the decision engine.
+
+action: BUY | WATCH | AVOID.
+snapshot_json stores the full pipeline state at decision time (market data,
+signals, backtest, reasoning) so the decision can be replayed offline.
+
+Outcome fields are populated by the outcome-measurement job at T+5:
+  outcome_measured      set to True once exit price is recorded
+  outcome_result        WIN | LOSS | NEUTRAL
+  outcome_return_pct    (exit_price / entry_price - 1) × 100
+"""
 from sqlalchemy import Column, Integer, String, Boolean, Numeric, DateTime, ForeignKey, Index, Uuid, JSON
 from .base import Base
 import datetime

@@ -1,21 +1,103 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+"""Stock endpoint — per-symbol chart data and full analysis detail.
+
+Routes:
+  GET  /{symbol}/chart  OHLCV bars + backtest signal markers + reference price levels
+                        period: 1mo | 3mo | 6mo | 1y | 2y
+                        interval: 1d | 1wk
+  GET  /{symbol}        Latest decision, signal summary, reasoning, and backtest stats
+"""
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import desc
+from sqlalchemy.orm import Session
+
+from agents import DataAgent
+from api.presenters import coerce_json, parse_reasoning, serialize_backtest, summarize_signals, to_float
 from database import get_db
-from models.db import Stock, Decision, ScanResult
-import json
+from models.db import Decision, ScanResult, Stock
+from utils.runtime_settings import get_runtime_settings
 
 router = APIRouter()
 
 
-@router.get("/{symbol}")
-def get_stock_detail(symbol: str, db: Session = Depends(get_db)):
-    """Full stock detail with latest signals, reasoning, backtest, and decision."""
+@router.get("/{symbol}/chart")
+def get_stock_chart(
+    symbol: str,
+    period: str = Query(default="6mo"),
+    interval: str = Query(default="1d"),
+    db: Session = Depends(get_db),
+):
+    """Return OHLCV chart data plus signal markers and reference levels."""
+
+    allowed_periods = {"1mo", "3mo", "6mo", "1y", "2y"}
+    allowed_intervals = {"1d", "1wk"}
+    if period not in allowed_periods:
+        raise HTTPException(status_code=400, detail="Unsupported chart period")
+    if interval not in allowed_intervals:
+        raise HTTPException(status_code=400, detail="Unsupported chart interval")
+
     stock = db.query(Stock).filter(Stock.symbol == symbol.upper()).first()
     if not stock:
         raise HTTPException(status_code=404, detail=f"Stock {symbol} not found")
 
-    # Get latest decision for this stock
+    decision = (
+        db.query(Decision)
+        .filter(Decision.symbol == symbol.upper())
+        .order_by(desc(Decision.decided_at))
+        .first()
+    )
+    scan_result = None
+    if decision and decision.scan_result_id:
+        scan_result = db.query(ScanResult).filter(ScanResult.id == decision.scan_result_id).first()
+
+    chart_data = DataAgent(db).get_chart_data(symbol.upper(), period=period, interval=interval)
+    markers = []
+    cases = scan_result.backtest_cases_json if scan_result and scan_result.backtest_cases_json else []
+    if isinstance(cases, list):
+        for case in cases:
+            case_date = case.get("date")
+            if not case_date:
+                continue
+            markers.append(
+                {
+                    "date": case_date,
+                    "type": "backtest_case",
+                    "return_pct": to_float(case.get("return_pct")),
+                    "profitable": (to_float(case.get("return_pct")) or 0) >= 0,
+                }
+            )
+
+    breakout_details = coerce_json(scan_result.breakout_details if scan_result else None)
+
+    reference_levels = {
+        "resistance_level": to_float((breakout_details or {}).get("resistance_level")),
+        "support_level": to_float(decision.stop_loss) if decision and decision.stop_loss is not None else None,
+        "target_price": to_float(decision.target_price) if decision and decision.target_price is not None else None,
+    }
+
+    return {
+        "success": True,
+        "data": {
+            "symbol": stock.symbol,
+            "period": period,
+            "interval": interval,
+            "ohlcv": chart_data,
+            "signal_markers": markers,
+            **reference_levels,
+        },
+    }
+
+
+@router.get("/{symbol}")
+def get_stock_detail(symbol: str, db: Session = Depends(get_db)):
+    """Return full detail for the latest analysis of a stock."""
+
+    stock = db.query(Stock).filter(Stock.symbol == symbol.upper()).first()
+    if not stock:
+        raise HTTPException(status_code=404, detail=f"Stock {symbol} not found")
+
+    settings = get_runtime_settings(db)
     decision = (
         db.query(Decision)
         .filter(Decision.symbol == symbol.upper())
@@ -23,24 +105,15 @@ def get_stock_detail(symbol: str, db: Session = Depends(get_db)):
         .first()
     )
 
-    # Get latest scan result for this stock
     scan_result = None
     if decision and decision.scan_result_id:
         scan_result = db.query(ScanResult).filter(ScanResult.id == decision.scan_result_id).first()
-
-    # Parse reasoning
-    parsed_reasoning = {}
-    if scan_result and scan_result.reasoning_text:
-        try:
-            parsed_reasoning = json.loads(scan_result.reasoning_text)
-        except (json.JSONDecodeError, TypeError):
-            parsed_reasoning = {"llm_summary": scan_result.reasoning_text}
 
     stock_data = {
         "symbol": stock.symbol,
         "name": stock.name,
         "sector": stock.sector,
-        "market_cap_cr": float(stock.market_cap_cr) if stock.market_cap_cr else None,
+        "market_cap_cr": to_float(stock.market_cap_cr),
         "is_active": stock.is_active,
     }
 
@@ -49,69 +122,45 @@ def get_stock_detail(symbol: str, db: Session = Depends(get_db)):
             "success": True,
             "data": {
                 "stock": stock_data,
+                "meta": None,
                 "decision": None,
                 "signals": None,
                 "reasoning": None,
                 "backtest": None,
-            }
+            },
         }
 
     decision_data = {
         "decision_id": str(decision.decision_id),
         "action": decision.action,
-        "confidence": float(decision.confidence),
-        "entry_price": float(decision.entry_price) if decision.entry_price else None,
-        "target_price": float(decision.target_price) if decision.target_price else None,
-        "stop_loss": float(decision.stop_loss) if decision.stop_loss else None,
-        "rr_ratio": float(decision.rr_ratio) if decision.rr_ratio else None,
-        "score_signal": float(decision.score_signal) if decision.score_signal else None,
-        "score_backtest": float(decision.score_backtest) if decision.score_backtest else None,
-        "score_composite": float(decision.score_composite) if decision.score_composite else None,
+        "confidence": to_float(decision.confidence) or 0.0,
+        "entry_price": to_float(decision.entry_price),
+        "target_price": to_float(decision.target_price),
+        "stop_loss": to_float(decision.stop_loss),
+        "rr_ratio": to_float(decision.rr_ratio),
+        "score_breakdown": {
+            "signal_score": to_float(decision.score_signal),
+            "backtest_score": to_float(decision.score_backtest),
+            "composite_score": to_float(decision.score_composite),
+        },
         "decided_at": decision.decided_at.isoformat(),
         "outcome_measured": decision.outcome_measured,
-        "outcome_return_pct": float(decision.outcome_return_pct) if decision.outcome_return_pct else None,
+        "outcome_return_pct": to_float(decision.outcome_return_pct),
         "outcome_result": decision.outcome_result,
     }
-
-    signals_data = None
-    backtest_data = None
-    if scan_result:
-        extra_signals = scan_result.extra_signals_json or {}
-        signals_data = {
-            "breakout": scan_result.breakout_triggered,
-            "volume_spike": scan_result.volume_spike_triggered,
-            "bulk_deal": scan_result.bulk_deal_triggered,
-            "news_sentiment": extra_signals.get("news_sentiment", {}),
-            "social_sentiment": extra_signals.get("social_sentiment", {}),
-            "insider_filing": extra_signals.get("insider_filing", {}),
-            "macro_context": extra_signals.get("macro_context", {}),
-            "signal_count": scan_result.signal_count,
-            "composite_score": float(scan_result.composite_score) if scan_result.composite_score else None,
-            "price": float(scan_result.price) if scan_result.price else None,
-            "volume_today": scan_result.volume_today,
-            "volume_avg_20d": scan_result.volume_avg_20d,
-            "volume_ratio": float(scan_result.volume_ratio) if scan_result.volume_ratio else None,
-            "breakout_details": scan_result.breakout_details,
-            "volume_spike_details": scan_result.volume_spike_details,
-            "bulk_deal_details": scan_result.bulk_deal_details,
-            "signal_diagnostics": scan_result.data_quality_json or {},
-        }
-        backtest_data = {
-            "matches": scan_result.backtest_matches,
-            "success_rate": float(scan_result.backtest_success_rate) if scan_result.backtest_success_rate else None,
-            "avg_return": float(scan_result.backtest_avg_return) if scan_result.backtest_avg_return else None,
-            "worst_case": float(scan_result.backtest_worst_case) if scan_result.backtest_worst_case else None,
-            "best_case": float(scan_result.backtest_best_case) if scan_result.backtest_best_case else None,
-            "cases": scan_result.backtest_cases_json,
-        }
 
     return {
         "success": True,
         "data": {
             "stock": stock_data,
+            "meta": {
+                "scanned_at": scan_result.scanned_at.isoformat() if scan_result and scan_result.scanned_at else None,
+                "backtest_lookback_years": settings.get("backtest_lookback_years", "2"),
+                "backtest_outcome_days": settings.get("backtest_outcome_days", "5"),
+            },
             "decision": decision_data,
-            "signals": signals_data,
-            "reasoning": parsed_reasoning,
-            "backtest": backtest_data,
-        }
+            "signals": summarize_signals(scan_result),
+            "reasoning": parse_reasoning(scan_result.reasoning_text if scan_result else None),
+            "backtest": serialize_backtest(scan_result),
+        },
     }

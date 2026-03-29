@@ -1,322 +1,383 @@
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { api } from "./api/client";
-import type { DecisionEntry, ScanRun } from "./api/client";
+/**
+ * History — audit trail for decisions and scan runs.
+ *
+ * Views (tab-switched):
+ *   decisions   Summary metrics + filter bar + sortable decision log table
+ *               Click any row to open DecisionReplayDrawer with full snapshot.
+ *   scan runs   Archive table of every ScanRun record.
+ *
+ * Actions:
+ *   Export CSV  — downloads filtered decisions as attachment via blob URL.
+ *   Replay      — loads DecisionDetailResponse and opens the drawer overlay.
+ */
+import { useEffect, useMemo, useState } from "react";
+import { Download, Eye, Filter } from "lucide-react";
 import {
-  History as HistoryIcon,
-  CheckCircle2,
-  ServerCrash,
-  TrendingUp,
-  TrendingDown,
-  Filter,
-} from "lucide-react";
+  api,
+  type DecisionDetailResponse,
+  type DecisionEntry,
+  type ScanSummary,
+} from "./api/client";
+import { DecisionReplayDrawer } from "./components/DecisionReplayDrawer";
+import {
+  Button,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  MetricCard,
+  PageHeader,
+  Panel,
+  SectionTabs,
+  StatusBadge,
+} from "./components/ui";
+import {
+  formatCurrency,
+  formatDateTime,
+  formatDuration,
+  formatPercent,
+  getActionTone,
+} from "./lib/format";
 
-type View = "decisions" | "scans";
+type HistoryView = "decisions" | "scans";
+
+interface FilterState {
+  action: string;
+  outcome: string;
+  symbol: string;
+  fromDate: string;
+  toDate: string;
+}
+
+const initialFilters: FilterState = {
+  action: "",
+  outcome: "",
+  symbol: "",
+  fromDate: "",
+  toDate: "",
+};
 
 export default function History() {
-  const [view, setView] = useState<View>("decisions");
+  const [view, setView] = useState<HistoryView>("decisions");
+  const [filters, setFilters] = useState<FilterState>(initialFilters);
   const [decisions, setDecisions] = useState<DecisionEntry[]>([]);
-  const [scans, setScans] = useState<ScanRun[]>([]);
-  const [trackRecord, setTrackRecord] = useState<any>(null);
+  const [scans, setScans] = useState<ScanSummary[]>([]);
+  const [summary, setSummary] = useState<{
+    total_decisions: number;
+    buy_decisions: number;
+    measured: number;
+    wins: number;
+    win_rate_pct: number | null;
+    avg_return_pct: number | null;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [actionFilter, setActionFilter] = useState("");
+  const [error, setError] = useState("");
+  const [selectedDecision, setSelectedDecision] = useState<DecisionDetailResponse | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   useEffect(() => {
-    setLoading(true);
-    if (view === "decisions") {
-      api
-        .getDecisionHistory(actionFilter || undefined)
-        .then((res) => {
-          setDecisions(res.data.decisions);
-          setTrackRecord(res.data.track_record);
-        })
-        .catch(console.error)
-        .finally(() => setLoading(false));
-    } else {
-      api
-        .getScanHistory()
-        .then((res) => setScans(res.data))
-        .catch(console.error)
-        .finally(() => setLoading(false));
+    let cancelled = false;
+
+    const loadHistory = async () => {
+      try {
+        if (view === "decisions") {
+          const response = await api.getHistory({
+            action: filters.action || undefined,
+            outcome: filters.outcome || undefined,
+            symbol: filters.symbol || undefined,
+            from_date: filters.fromDate || undefined,
+            to_date: filters.toDate || undefined,
+            limit: 80,
+          });
+          if (cancelled) return;
+          setDecisions(response.data.decisions);
+          setSummary(response.data.summary);
+        } else {
+          const response = await api.getScanHistory(60);
+          if (cancelled) return;
+          setScans(response.data);
+        }
+        setError("");
+      } catch (historyError) {
+        if (cancelled) return;
+        setError(historyError instanceof Error ? historyError.message : "Unable to load history.");
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadHistory();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [filters.action, filters.fromDate, filters.outcome, filters.symbol, filters.toDate, view]);
+
+  const measuredShare = useMemo(() => {
+    if (!summary || summary.total_decisions === 0) return "NA";
+    return formatPercent((summary.measured / summary.total_decisions) * 100);
+  }, [summary]);
+
+  const handleExport = async () => {
+    try {
+      const blob = await api.exportHistoryCsv({
+        action: filters.action || undefined,
+        outcome: filters.outcome || undefined,
+        symbol: filters.symbol || undefined,
+        from_date: filters.fromDate || undefined,
+        to_date: filters.toDate || undefined,
+      });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `alphahunter_decisions_${new Date().toISOString().slice(0, 10)}.csv`;
+      anchor.click();
+      window.URL.revokeObjectURL(url);
+    } catch (exportError) {
+      setError(exportError instanceof Error ? exportError.message : "Unable to export history.");
     }
-  }, [view, actionFilter]);
+  };
 
-  return (
-    <div className="space-y-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-black text-white flex items-center gap-2">
-          <HistoryIcon className="text-blue-400" size={24} />
-          History
-        </h1>
-        <div className="flex gap-2">
-          <div className="flex bg-gray-800 rounded-lg p-0.5 border border-gray-700">
-            <button
-              onClick={() => setView("decisions")}
-              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                view === "decisions"
-                  ? "bg-gray-700 text-white"
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              Decisions
-            </button>
-            <button
-              onClick={() => setView("scans")}
-              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                view === "scans"
-                  ? "bg-gray-700 text-white"
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              Scan Runs
-            </button>
-          </div>
-        </div>
-      </div>
+  const openDecision = async (decisionId: string) => {
+    setDetailLoading(true);
+    try {
+      const response = await api.getHistoryDetail(decisionId);
+      setSelectedDecision(response.data);
+    } catch (detailError) {
+      setError(detailError instanceof Error ? detailError.message : "Unable to load decision detail.");
+    } finally {
+      setDetailLoading(false);
+    }
+  };
 
-      {/* Track record summary */}
-      {view === "decisions" && trackRecord && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div className="bg-gray-800 p-4 rounded-xl border border-gray-700 text-center">
-            <span className="text-gray-400 text-xs font-bold uppercase">
-              Total
-            </span>
-            <p className="text-xl font-bold text-white">
-              {trackRecord.total_decisions}
-            </p>
-          </div>
-          <div className="bg-gray-800 p-4 rounded-xl border border-gray-700 text-center">
-            <span className="text-gray-400 text-xs font-bold uppercase">
-              Measured
-            </span>
-            <p className="text-xl font-bold text-white">
-              {trackRecord.measured}
-            </p>
-          </div>
-          <div className="bg-gray-800 p-4 rounded-xl border border-gray-700 text-center">
-            <span className="text-gray-400 text-xs font-bold uppercase">
-              Wins
-            </span>
-            <p className="text-xl font-bold text-green-400">
-              {trackRecord.wins}
-            </p>
-          </div>
-          <div className="bg-gray-800 p-4 rounded-xl border border-green-900/30 text-center">
-            <span className="text-gray-400 text-xs font-bold uppercase">
-              Win Rate
-            </span>
-            <p className="text-xl font-bold text-green-400">
-              {trackRecord.win_rate != null ? `${trackRecord.win_rate}%` : "-"}
-            </p>
-          </div>
-          <div className="bg-gray-800 p-4 rounded-xl border border-blue-900/30 text-center">
-            <span className="text-gray-400 text-xs font-bold uppercase">
-              Avg Return
-            </span>
-            <p className="text-xl font-bold text-blue-400">
-              {trackRecord.avg_return_pct != null
-                ? `${trackRecord.avg_return_pct > 0 ? "+" : ""}${trackRecord.avg_return_pct}%`
-                : "-"}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Filter for decisions */}
-      {view === "decisions" && (
-        <div className="flex items-center gap-2">
-          <Filter size={16} className="text-gray-400" />
-          <select
-            value={actionFilter}
-            onChange={(e) => setActionFilter(e.target.value)}
-            aria-label="Filter by action"
-            className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500"
-          >
-            <option value="">All Actions</option>
-            <option value="BUY">BUY</option>
-            <option value="WATCH">WATCH</option>
-            <option value="AVOID">AVOID</option>
-          </select>
-        </div>
-      )}
-
-      {/* Content */}
-      <div className="bg-gray-800 rounded-xl shadow-lg border border-gray-700 overflow-hidden">
-        {loading ? (
-          <div className="flex justify-center py-10">
-            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : view === "decisions" ? (
-          <DecisionTable decisions={decisions} />
-        ) : (
-          <ScanTable scans={scans} />
-        )}
-      </div>
-    </div>
-  );
-}
-
-function DecisionTable({ decisions }: { decisions: DecisionEntry[] }) {
-  if (decisions.length === 0) {
-    return (
-      <div className="text-center py-10 text-gray-400">
-        No decisions recorded yet.
-      </div>
-    );
+  if (loading) {
+    return <LoadingState label="Loading history..." />;
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm text-gray-300">
-        <thead className="bg-gray-900 text-gray-400 uppercase text-xs">
-          <tr>
-            <th className="px-4 py-3">Stock</th>
-            <th className="px-4 py-3">Action</th>
-            <th className="px-4 py-3">Confidence</th>
-            <th className="px-4 py-3">Entry</th>
-            <th className="px-4 py-3">Target</th>
-            <th className="px-4 py-3">SL</th>
-            <th className="px-4 py-3">Date</th>
-            <th className="px-4 py-3">Outcome</th>
-          </tr>
-        </thead>
-        <tbody>
-          {decisions.map((d) => (
-            <tr
-              key={d.decision_id}
-              className="border-b border-gray-700/50 hover:bg-gray-700/30 transition-colors"
-            >
-              <td className="px-4 py-3">
-                <Link
-                  to={`/stock/${d.symbol}`}
-                  className="font-bold text-white hover:text-blue-400 transition-colors"
-                >
-                  {d.symbol}
-                </Link>
-              </td>
-              <td className="px-4 py-3">
-                <span
-                  className={`px-2 py-0.5 text-xs font-bold rounded ${
-                    d.action === "BUY"
-                      ? "bg-green-900/50 text-green-400"
-                      : d.action === "WATCH"
-                      ? "bg-yellow-900/50 text-yellow-400"
-                      : "bg-red-900/50 text-red-400"
-                  }`}
-                >
-                  {d.action}
-                </span>
-              </td>
-              <td className="px-4 py-3 font-mono text-blue-400">
-                {d.confidence}%
-              </td>
-              <td className="px-4 py-3 font-mono">
-                {d.entry_price ? `₹${d.entry_price}` : "-"}
-              </td>
-              <td className="px-4 py-3 font-mono text-green-400">
-                {d.target_price ? `₹${d.target_price}` : "-"}
-              </td>
-              <td className="px-4 py-3 font-mono text-red-400">
-                {d.stop_loss ? `₹${d.stop_loss}` : "-"}
-              </td>
-              <td className="px-4 py-3 text-xs text-gray-400">
-                {new Date(d.decided_at).toLocaleString()}
-              </td>
-              <td className="px-4 py-3">
-                {d.outcome_measured ? (
-                  <div className="flex items-center gap-1">
-                    {d.outcome_result === "WIN" ? (
-                      <TrendingUp size={14} className="text-green-400" />
-                    ) : (
-                      <TrendingDown size={14} className="text-red-400" />
-                    )}
-                    <span
-                      className={`font-mono text-xs font-bold ${
-                        d.outcome_result === "WIN"
-                          ? "text-green-400"
-                          : "text-red-400"
-                      }`}
-                    >
-                      {d.outcome_return_pct != null
-                        ? `${d.outcome_return_pct > 0 ? "+" : ""}${d.outcome_return_pct}%`
-                        : d.outcome_result}
-                    </span>
-                  </div>
-                ) : (
-                  <span className="text-gray-500 text-xs">Pending</span>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Audit trail"
+        title="Review outcomes, replay decisions, and export conviction history."
+        description="History gives investors a trust layer: a filtered decision log, scan-run archive, replay detail, and CSV export for deeper review."
+        actions={
+          <>
+            <SectionTabs
+              value={view}
+              onChange={setView}
+              tabs={[
+                { value: "decisions", label: "Decisions" },
+                { value: "scans", label: "Scan runs" },
+              ]}
+            />
+            {view === "decisions" ? (
+              <Button variant="secondary" onClick={() => void handleExport()}>
+                <Download className="size-4" />
+                Export CSV
+              </Button>
+            ) : null}
+          </>
+        }
+      />
 
-function ScanTable({ scans }: { scans: ScanRun[] }) {
-  if (scans.length === 0) {
-    return (
-      <div className="text-center py-10 text-gray-400">
-        No scans have been run yet.
-      </div>
-    );
-  }
+      {error ? <ErrorState description={error} /> : null}
 
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm text-gray-300">
-        <thead className="bg-gray-900 text-gray-400 uppercase text-xs">
-          <tr>
-            <th className="px-4 py-3">Status</th>
-            <th className="px-4 py-3">Started At</th>
-            <th className="px-4 py-3">Duration</th>
-            <th className="px-4 py-3">Triggered By</th>
-            <th className="px-4 py-3">Stocks Scanned</th>
-            <th className="px-4 py-3">Signals Found</th>
-          </tr>
-        </thead>
-        <tbody>
-          {scans.map((run, idx) => (
-            <tr
-              key={run.id}
-              className={`border-b border-gray-700/50 ${
-                idx % 2 === 0 ? "bg-gray-800/50" : "bg-gray-800"
-              }`}
-            >
-              <td className="px-4 py-4 font-medium flex items-center gap-2">
-                {run.status === "completed" ? (
-                  <CheckCircle2 className="text-emerald-500" size={16} />
-                ) : (
-                  <ServerCrash className="text-red-500" size={16} />
-                )}
-                <span
-                  className={
-                    run.status === "completed"
-                      ? "text-emerald-400"
-                      : "text-red-400"
-                  }
-                >
-                  {run.status}
+      {view === "decisions" && summary ? (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard label="Total decisions" value={summary.total_decisions} detail="Filtered recommendation count." />
+            <MetricCard label="Win rate" value={formatPercent(summary.win_rate_pct)} detail={`${summary.wins} winning calls`} tone="positive" />
+            <MetricCard label="Avg return" value={formatPercent(summary.avg_return_pct, true)} detail="Measured outcomes only." tone="warning" />
+            <MetricCard label="Measured share" value={measuredShare} detail={`${summary.measured} measured outcomes`} />
+          </div>
+
+          <Panel title="Decision filters" subtitle="Narrow the audit trail by action, outcome, symbol, or date range.">
+            <div className="grid gap-4 lg:grid-cols-[1fr_1fr_1.2fr_1fr_1fr]">
+              <label className="space-y-2">
+                <span className="flex items-center gap-2 text-sm font-medium text-white">
+                  <Filter className="size-4 text-cyan-200" />
+                  Action
                 </span>
-              </td>
-              <td className="px-4 py-4 font-mono">
-                {new Date(run.started_at).toLocaleString()}
-              </td>
-              <td className="px-4 py-4">
-                {run.duration_secs
-                  ? `${Number(run.duration_secs).toFixed(2)}s`
-                  : "-"}
-              </td>
-              <td className="px-4 py-4">{run.triggered_by}</td>
-              <td className="px-4 py-4">{run.stocks_scanned}</td>
-              <td className="px-4 py-4 font-bold text-white">
-                {run.signals_found}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                <select
+                  value={filters.action}
+                  onChange={(event) => setFilters((current) => ({ ...current, action: event.target.value }))}
+                  className="terminal-select"
+                >
+                  <option value="">All actions</option>
+                  <option value="BUY">BUY</option>
+                  <option value="WATCH">WATCH</option>
+                  <option value="AVOID">AVOID</option>
+                </select>
+              </label>
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-white">Outcome</span>
+                <select
+                  value={filters.outcome}
+                  onChange={(event) => setFilters((current) => ({ ...current, outcome: event.target.value }))}
+                  className="terminal-select"
+                >
+                  <option value="">All outcomes</option>
+                  <option value="profit">Profit</option>
+                  <option value="loss">Loss</option>
+                  <option value="pending">Pending</option>
+                </select>
+              </label>
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-white">Symbol</span>
+                <input
+                  value={filters.symbol}
+                  onChange={(event) => setFilters((current) => ({ ...current, symbol: event.target.value.toUpperCase() }))}
+                  className="terminal-input"
+                  placeholder="INFY"
+                />
+              </label>
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-white">From date</span>
+                <input
+                  type="date"
+                  value={filters.fromDate}
+                  onChange={(event) => setFilters((current) => ({ ...current, fromDate: event.target.value }))}
+                  className="terminal-input"
+                />
+              </label>
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-white">To date</span>
+                <input
+                  type="date"
+                  value={filters.toDate}
+                  onChange={(event) => setFilters((current) => ({ ...current, toDate: event.target.value }))}
+                  className="terminal-input"
+                />
+              </label>
+            </div>
+          </Panel>
+
+          <Panel title="Decision log" subtitle="Click any row to replay the full stored snapshot.">
+            {decisions.length === 0 ? (
+              <EmptyState
+                title="No decision history matches the filters"
+                description="Try a broader date range or clear one of the filters to restore the audit trail."
+                action={<Button onClick={() => setFilters(initialFilters)}>Reset filters</Button>}
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="terminal-table">
+                  <thead>
+                    <tr>
+                      <th>Stock</th>
+                      <th>Action</th>
+                      <th>Confidence</th>
+                      <th>Entry</th>
+                      <th>Target</th>
+                      <th>Outcome</th>
+                      <th>Decided</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {decisions.map((decision) => (
+                      <tr key={decision.decision_id}>
+                        <td>
+                          <div>
+                            <p className="font-medium text-white">{decision.symbol}</p>
+                            <p className="text-xs text-slate-500">{decision.name}</p>
+                          </div>
+                        </td>
+                        <td>
+                          <StatusBadge
+                            label={decision.action}
+                            tone={getActionTone(decision.action)}
+                          />
+                        </td>
+                        <td>{formatPercent(decision.confidence)}</td>
+                        <td>{formatCurrency(decision.entry_price)}</td>
+                        <td>{formatCurrency(decision.target_price)}</td>
+                        <td>
+                          {decision.outcome_measured ? (
+                            <span className={decision.outcome_return_pct != null && decision.outcome_return_pct >= 0 ? "text-emerald-300" : "text-rose-300"}>
+                              {formatPercent(decision.outcome_return_pct, true)}
+                            </span>
+                          ) : (
+                            <span className="text-slate-500">Pending</span>
+                          )}
+                        </td>
+                        <td>{formatDateTime(decision.decided_at)}</td>
+                        <td>
+                          <button
+                            type="button"
+                            onClick={() => void openDecision(decision.decision_id)}
+                            className="inline-flex items-center gap-2 rounded-full border border-white/8 px-3 py-1 text-sm text-cyan-200 hover:border-cyan-400/30 hover:text-white"
+                          >
+                            <Eye className="size-4" />
+                            Replay
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Panel>
+        </>
+      ) : null}
+
+      {view === "scans" ? (
+        <Panel title="Scan run archive" subtitle="Recent scan runs with duration, coverage, and signal yield.">
+          {scans.length === 0 ? (
+            <EmptyState
+              title="No scans recorded yet"
+              description="Trigger a market scan from the dashboard or scanner to begin building the audit archive."
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="terminal-table">
+                <thead>
+                  <tr>
+                    <th>Status</th>
+                    <th>Started</th>
+                    <th>Completed</th>
+                    <th>Duration</th>
+                    <th>Triggered by</th>
+                    <th>Stocks</th>
+                    <th>Signals</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {scans.map((scan) => (
+                    <tr key={scan.scan_run_id}>
+                      <td>
+                        <StatusBadge
+                          label={scan.status}
+                          tone={
+                            scan.status === "completed"
+                              ? "positive"
+                              : scan.status === "running"
+                                ? "info"
+                                : "danger"
+                          }
+                        />
+                      </td>
+                      <td>{formatDateTime(scan.started_at)}</td>
+                      <td>{formatDateTime(scan.completed_at)}</td>
+                      <td>{formatDuration(scan.duration_secs)}</td>
+                      <td>{scan.triggered_by}</td>
+                      <td>{scan.stocks_scanned}</td>
+                      <td>{scan.signals_found}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Panel>
+      ) : null}
+
+      {detailLoading ? <LoadingState label="Loading decision replay..." /> : null}
+      {selectedDecision ? (
+        <DecisionReplayDrawer detail={selectedDecision} onClose={() => setSelectedDecision(null)} />
+      ) : null}
     </div>
   );
 }

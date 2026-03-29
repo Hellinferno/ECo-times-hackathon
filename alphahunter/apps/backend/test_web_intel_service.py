@@ -1,3 +1,13 @@
+"""Unit test for WebIntelService fail-open behaviour with a stubbed provider.
+
+FakeProvider simulates a partial failure: news_sentiment raises RuntimeError
+while all other source types succeed. The test asserts that:
+  - The news_sentiment WebFetchRun row has status="failed".
+  - All 5 source-type WebFetchRun rows are created.
+  - Successful source types still persist ExternalSignalEvent rows to the DB.
+
+Uses an in-memory SQLite database — no network or real DB required.
+"""
 from datetime import datetime, timedelta
 from decimal import Decimal
 

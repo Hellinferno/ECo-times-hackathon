@@ -1,3 +1,9 @@
+"""Mock test for SignalAgent — validates breakout + volume spike + bulk deal detection.
+
+Builds synthetic OHLCV data (35 days at close=100, volume=10 000) and injects a
+current price of 110 with volume=50 000 and a large BUY bulk deal to confirm that
+all three core signals are triggered and composite_score > 0.5.
+"""
 import json
 import datetime
 from loguru import logger

@@ -1,3 +1,18 @@
+"""WebIntelService — orchestrates the TinyFish prefetch pipeline.
+
+Responsibilities:
+  - Decides whether the event cache is stale (default: older than 5 minutes).
+  - Builds natural-language GoalSpec objects per source type × symbol.
+  - Dispatches goals to the WebIntelProvider in configurable batch chunks.
+  - Persists NormalizedSignalEvent rows, skipping duplicates via dedupe_hash.
+  - Records a WebFetchRun row per source type with status and duration.
+  - Expands __GLOBAL__ macro_indicator events into per-symbol rows.
+  - Purges expired ExternalSignalEvent rows before each prefetch.
+
+SOURCE_CONFIG defines the five supported source types with their canonical
+URLs and TTL in minutes (bulk_deal=360, insider_filing=720, macro_indicator=60,
+news_sentiment=180, social_sentiment=180).
+"""
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -13,6 +28,8 @@ from models.db import ExternalSignalEvent, WebFetchRun
 from providers import GoalSpec, NormalizedSignalEvent, TinyFishProvider, WebIntelProvider
 from utils.runtime_settings import get_runtime_settings, parse_int
 
+
+# ── Source configuration ──────────────────────────────────────────────────────
 
 SOURCE_CONFIG: Dict[str, Dict[str, Any]] = {
     "bulk_deal": {
@@ -41,6 +58,9 @@ SOURCE_CONFIG: Dict[str, Dict[str, Any]] = {
         "global": True,
     },
 }
+
+
+# ── Service ───────────────────────────────────────────────────────────────────
 
 
 class WebIntelService:

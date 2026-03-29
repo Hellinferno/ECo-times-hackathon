@@ -1,3 +1,11 @@
+"""Web intelligence provider interface and shared data types.
+
+Defines the abstract WebIntelProvider contract so concrete implementations
+(e.g. TinyFishProvider) can be swapped in tests or replaced at runtime.
+
+Supported event types (SUPPORTED_EVENT_TYPES):
+  bulk_deal | news_sentiment | social_sentiment | insider_filing | macro_indicator
+"""
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -7,6 +15,8 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 
+# ── Constants ─────────────────────────────────────────────────────────────────
+
 SUPPORTED_EVENT_TYPES = {
     "bulk_deal",
     "news_sentiment",
@@ -14,6 +24,9 @@ SUPPORTED_EVENT_TYPES = {
     "insider_filing",
     "macro_indicator",
 }
+
+
+# ── Data types ────────────────────────────────────────────────────────────────
 
 
 @dataclass
@@ -51,6 +64,9 @@ class NormalizedSignalEvent:
             "expires_at": self.expires_at,
             "dedupe_hash": self.dedupe_hash,
         }
+
+
+# ── Abstract provider ─────────────────────────────────────────────────────────
 
 
 class WebIntelProvider(ABC):

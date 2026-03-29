@@ -1,8 +1,21 @@
+"""Runtime settings — merge DB SystemSetting rows over hard-coded defaults.
+
+get_runtime_settings() returns a Dict[str, str] that callers read via the
+three typed helpers:
+  parse_int()    → int with fallback
+  parse_float()  → float with fallback
+  parse_bool()   → bool with fallback (accepts 1/true/yes/on and their negations)
+
+DEFAULT_SYSTEM_SETTINGS provides sensible production defaults for all known
+keys so the app works out-of-the-box without any DB rows.
+"""
 from typing import Any, Dict
 from sqlalchemy.orm import Session
 
 from models.db import SystemSetting
 
+
+# ── Defaults ──────────────────────────────────────────────────────────────────
 
 DEFAULT_SYSTEM_SETTINGS: Dict[str, str] = {
     "scan_interval_minutes": "15",
@@ -25,6 +38,9 @@ DEFAULT_SYSTEM_SETTINGS: Dict[str, str] = {
     "insider_lookback_days": "5",
     "macro_lookback_minutes": "60",
 }
+
+
+# ── Accessors ─────────────────────────────────────────────────────────────────
 
 
 def get_runtime_settings(db: Session) -> Dict[str, str]:

@@ -1,3 +1,17 @@
+"""TinyFish provider — calls the TinyFish SSE run-goal API in parallel.
+
+TinyFishProvider implements WebIntelProvider using the TinyFish browser-agent
+API endpoint (configured via TINYFISH_RUN_SSE_URL + MINO_API_KEY).
+
+Key behaviours:
+  - run_goal_batch() fans out goals via ThreadPoolExecutor (up to max_concurrency).
+  - Each call POSTs a GoalSpec and streams the SSE response; the last JSON frame
+    is used as the payload (fallback to plain JSON for non-SSE providers).
+  - _normalize_payload() extracts event arrays from provider-specific envelopes
+    (events / data / result keys, including double-encoded JSON strings).
+  - Retries each goal up to 3 times with exponential back-off (tenacity).
+  - All numeric fields (strength / sentiment / confidence) are coerced to Decimal.
+"""
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -17,6 +31,9 @@ from providers.web_intel_provider import (
     SUPPORTED_EVENT_TYPES,
     WebIntelProvider,
 )
+
+
+# ── Provider ──────────────────────────────────────────────────────────────────
 
 
 class TinyFishProvider(WebIntelProvider):

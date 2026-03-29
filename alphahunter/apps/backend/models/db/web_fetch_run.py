@@ -1,3 +1,10 @@
+"""WebFetchRun — execution record for a TinyFish / web-intel prefetch batch.
+
+source_type: tinyfish | generic_web.
+status: running | completed | failed.
+symbols_count / success_count track batch coverage.
+error_summary stores a truncated message from the first unrecoverable error.
+"""
 from sqlalchemy import Column, Integer, String, DateTime, Text, Uuid, Index
 from .base import Base
 import datetime

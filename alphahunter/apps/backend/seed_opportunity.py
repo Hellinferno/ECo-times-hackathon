@@ -1,3 +1,12 @@
+"""Seed script — inserts a synthetic BUY opportunity for INFY into the database.
+
+Useful for local development and UI smoke-testing when no real scan has run yet.
+Creates one ScanRun (status=completed) and calls AuditAgent to persist a
+ScanResult + Decision row with hard-coded signal and reasoning data.
+
+Usage:
+  python seed_opportunity.py
+"""
 import json
 from datetime import datetime
 from database import SessionLocal
