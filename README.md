@@ -1,217 +1,280 @@
-# AlphaHunter AI
+<div align="center">
 
-**Autonomous Stock Market Intelligence Engine for Indian Retail Investors**
+# ECo Times Hackathon — AI Financial Intelligence Suite
 
-AlphaHunter AI continuously monitors 100+ NSE-listed stocks, detects trading opportunities using multi-signal analysis, explains reasoning in plain English backed by real data, validates recommendations against 2 years of historical patterns, and delivers actionable trade recommendations with specific entry prices, targets, and stop-losses.
+[![Hackathon](https://img.shields.io/badge/ECo_Times-Hackathon_2026-FF6B35?style=for-the-badge)](https://github.com/Hellinferno/ECo-times-hackathon)
+[![Projects](https://img.shields.io/badge/Projects-3-4F46E5?style=for-the-badge)](#the-suite)
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://typescriptlang.org)
+[![Gemini](https://img.shields.io/badge/Gemini_API-Powered-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev)
 
----
+**One monorepo. Three AI-powered platforms. Built for the ECo Times Hackathon.**
 
-## How It Works
+[AlphaHunter](#-alphahunter-ai) · [WorldMonitor](#-worldmonitor) · [AIBAA](#-aibaa) · [Quick Start](#-quick-start) · [Deployment](#-deployment)
 
-```
-Detect → Explain → Validate → Decide → Audit
-```
-
-1. **Market Scanner** — Monitors NSE stocks every 15 minutes during market hours
-2. **Signal Detection** — 3 algorithms: Breakout, Volume Spike, Bulk Deal detection
-3. **AI Reasoning** — Gemini generates data-grounded explanations referencing actual values
-4. **Backtesting** — Historical pattern matching with T+5 outcome measurement
-5. **Decision Engine** — Outputs BUY/WATCH/AVOID with 0-100 confidence score, entry, target, stop-loss
+</div>
 
 ---
 
-## Tech Stack
+## The Suite
 
-| Layer | Technology |
-|-------|-----------|
-| **Backend** | Python 3.11, FastAPI, SQLAlchemy, APScheduler |
-| **Frontend** | React 19, TypeScript, Tailwind CSS 4, Recharts |
-| **Database** | PostgreSQL 15, Redis 7 |
-| **AI/LLM** | Gemini API (`google-genai`) |
-| **Data** | yfinance, NSE bulk deals API |
-| **Infra** | Docker Compose, Alembic migrations |
+Three independent yet complementary platforms that cover the full spectrum of AI-powered financial intelligence — from real-time stock signals and global geopolitical risk to enterprise-grade investment banking automation.
 
 ---
 
-## Project Structure
+### AlphaHunter AI
 
-```
-alphahunter/
-├── apps/
-│   ├── backend/                 # FastAPI application
-│   │   ├── agents/              # 6-agent pipeline (Data, Signal, Backtest, Reasoning, Decision, Audit)
-│   │   ├── api/endpoints/       # REST API (14 endpoints)
-│   │   ├── models/db/           # SQLAlchemy ORM models (11 tables)
-│   │   ├── alembic/             # Database migrations
-│   │   ├── main.py              # FastAPI app entry point
-│   │   └── config.py            # Settings & environment
-│   └── frontend/                # React + TypeScript SPA
-│       └── src/
-│           ├── api/client.ts    # Typed API client
-│           ├── components/      # Navbar, Layout
-│           ├── Dashboard.tsx    # Opportunity grid with scan trigger
-│           ├── StockDetail.tsx  # Tabbed analysis (Overview, Signals, Backtest, Trade Plan)
-│           ├── History.tsx      # Decision history with track record
-│           ├── Watchlist.tsx    # Stock watchlist management
-│           ├── Alerts.tsx       # Alert center
-│           └── Settings.tsx     # System configuration
-├── scripts/                     # Seed data scripts
-├── files/                       # Project specifications & architecture docs
-├── docker-compose.yml           # Full stack orchestration
-└── Makefile                     # Development commands
-```
+> **Autonomous Stock Market Intelligence Engine for Indian Retail Investors**
+
+[![Docs](https://img.shields.io/badge/README-alphahunter%2F-blue?style=flat)](alphahunter/README.md)
+[![Stack](https://img.shields.io/badge/FastAPI_+_React_+_Gemini-stack-informational?style=flat)]()
+
+AlphaHunter continuously monitors **100+ NSE-listed stocks**, detects trading opportunities using a 6-agent AI pipeline, validates every signal against **2 years of historical data**, and delivers actionable trade recommendations with entry, target, and stop-loss levels — explained in plain English.
+
+**Key capabilities:**
+- Real-time market scanning every 15 minutes during market hours
+- 3 signal algorithms: Breakout, Volume Spike, Bulk Deal detection
+- Gemini-powered reasoning grounded in actual price/volume data
+- Confidence-scored decisions: **BUY / WATCH / AVOID** (0–100 scale)
+- Full decision audit trail with track record
+
+**Tech:** Python 3.11 · FastAPI · PostgreSQL · Redis · React 19 · Tailwind CSS 4 · Gemini API · yfinance · Docker
+
+→ [Full documentation](alphahunter/README.md)
 
 ---
 
-## API Endpoints
+### WorldMonitor
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/scan` | Trigger full market scan |
-| `GET` | `/api/opportunities` | List active opportunities |
-| `GET` | `/api/opportunities/:id` | Opportunity detail |
-| `GET` | `/api/stock/:symbol` | Full stock analysis |
-| `GET` | `/api/history` | Decision history with track record |
-| `GET` | `/api/history/scans` | Scan run history |
-| `GET` | `/api/watchlist` | User watchlist |
-| `POST` | `/api/watchlist/:symbol` | Add to watchlist |
-| `DELETE` | `/api/watchlist/:symbol` | Remove from watchlist |
-| `GET` | `/api/alerts` | List alerts |
-| `POST` | `/api/alerts/mark-read` | Mark alerts as read |
-| `GET` | `/api/settings` | System settings |
-| `PATCH` | `/api/settings` | Update settings |
-| `GET` | `/api/health` | Health check |
+> **Real-Time Global Intelligence Dashboard**
+
+[![Docs](https://img.shields.io/badge/README-worldmonitor%2F-blue?style=flat)](worldmonitor/README.md)
+[![Live](https://img.shields.io/badge/Live-worldmonitor.app-green?style=flat)](https://worldmonitor.app)
+[![Stack](https://img.shields.io/badge/TypeScript_+_Tauri_+_deck.gl-stack-informational?style=flat)]()
+
+WorldMonitor is a sophisticated situational awareness platform aggregating **435+ curated news feeds**, real-time geospatial data, and financial market signals into a unified AI-synthesized intelligence brief. It runs as a web app, PWA, or native desktop app.
+
+**Key capabilities:**
+- 435+ feeds across 15 categories, AI-synthesized into actionable briefs
+- Dual map engine: 3D globe (globe.gl) + WebGL flat map (deck.gl) with 45 data layers
+- Country Intelligence Index: composite risk scoring across 12 signal categories
+- Finance radar: 92 stock exchanges, commodities, crypto, 7-signal market composite
+- Local AI with Ollama — no API keys required
+- Native desktop app (Tauri 2) for Windows, macOS, Linux
+- 5 site variants from a single codebase · 21 languages + RTL
+
+**Tech:** Vanilla TypeScript · Vite · globe.gl · deck.gl · MapLibre GL · Tauri 2 (Rust) · Ollama · Convex · Protocol Buffers
+
+→ [Full documentation](worldmonitor/README.md) · [Live app](https://worldmonitor.app)
+
+---
+
+### AIBAA
+
+> **AI Investment Banking Analyst Agent**
+
+[![Docs](https://img.shields.io/badge/README-AIBAA%2F-blue?style=flat)](<AI Investment Banking Analyst Agent (AIBAA)/README.md>)
+[![Stack](https://img.shields.io/badge/FastAPI_+_React_+_Gemini_+_NVIDIA_NIM-stack-informational?style=flat)]()
+[![Version](https://img.shields.io/badge/version-1.0.0--alpha-blue.svg)]()
+
+AIBAA is an enterprise-grade financial analysis platform built on a Multi-Agent architecture. It automates complex investment banking tasks — DCF/LBO modeling, pitchbook generation, due diligence — through six specialized AI agents orchestrated by a central routing layer.
+
+**Key capabilities:**
+- Multi-agent orchestration: Financial Modeling · Pitchbook · Due Diligence · Market Research · Doc Drafter · Coordination
+- DCF modeling: multi-scenario (Base/Bear/Bull), WACC calculator, implied share price ranges
+- LBO modeling: Sources & Uses mechanics, IRR targets, MOIC, debt scheduling
+- Professional-grade Excel generation (`.xlsx` IB models)
+- RAG pipeline with ChromaDB for document-grounded analysis (WIP)
+
+**Tech:** Python 3.11 · FastAPI · PostgreSQL · Redis · ChromaDB · React · Vite · Gemini API · NVIDIA NIM · Docker
+
+→ [Full documentation](<AI Investment Banking Analyst Agent (AIBAA)/README.md>)
+
+---
+
+## Architecture Overview
+
+The three platforms are independent deployments that can share data through well-defined interfaces:
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                    ECo Times AI Suite                           │
+│                                                                 │
+│  ┌─────────────────┐  ┌──────────────────┐  ┌───────────────┐ │
+│  │  AlphaHunter    │  │  WorldMonitor     │  │    AIBAA      │ │
+│  │                 │  │                  │  │               │ │
+│  │ NSE Stock       │  │ Geopolitical     │  │ Investment    │ │
+│  │ Intelligence    │  │ Risk Monitoring  │  │ Banking AI    │ │
+│  │                 │  │                  │  │               │ │
+│  │ FastAPI+React   │  │ TypeScript+Tauri │  │ FastAPI+React │ │
+│  │ Gemini API      │  │ Local AI/Ollama  │  │ Gemini+NVIDIA │ │
+│  └────────┬────────┘  └────────┬─────────┘  └───────┬───────┘ │
+│           │                   │                     │         │
+│           └───────────────────┼─────────────────────┘         │
+│                               │                               │
+│               WorldMonitor sidecar integration                │
+│          (macro/market/geopolitical risk data → AIBAA)        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+> AIBAA optionally mounts WorldMonitor as a sidecar service to feed live macroeconomic, geopolitical, and commodity data into its financial models.
+
+---
+
+## Repository Structure
+
+```text
+ECo-times-hackathon/
+├── alphahunter/                          # AlphaHunter AI — NSE stock intelligence
+│   ├── apps/
+│   │   ├── backend/                      # FastAPI + 6-agent pipeline
+│   │   └── frontend/                     # React 19 + TypeScript SPA
+│   ├── docker-compose.yml
+│   ├── Makefile
+│   └── README.md                         ← AlphaHunter documentation
+│
+├── worldmonitor/                         # WorldMonitor — global intelligence dashboard
+│   ├── src/                              # Vanilla TypeScript + deck.gl
+│   ├── src-tauri/                        # Rust desktop app
+│   ├── vercel.json
+│   └── README.md                         ← WorldMonitor documentation
+│
+├── AI Investment Banking Analyst Agent (AIBAA)/   # AIBAA — investment banking AI
+│   ├── apps/
+│   │   ├── api/                          # FastAPI backend
+│   │   └── web/                          # React frontend
+│   ├── aibaa/                            # Core Python package
+│   ├── docker-compose.yml
+│   └── README.md                         ← AIBAA documentation
+│
+├── files/                                # Shared project specifications (12 docs)
+│   ├── 01-project-overview.md
+│   ├── 04-system-architecture.md
+│   ├── 08-computation-engine.md
+│   └── ...
+│
+└── README.md                             ← You are here
+```
 
 ---
 
 ## Quick Start
 
-### Prerequisites
-- Python 3.11+
-- Node.js 20+
-- Docker & Docker Compose (for PostgreSQL & Redis)
-
-### Setup
+### AlphaHunter
 
 ```bash
-# 1. Clone the repo
 git clone https://github.com/Hellinferno/ECo-times-hackathon.git
-cd ECo-times-hackathon
+cd ECo-times-hackathon/alphahunter
 
-# 2. Start infrastructure
-cd alphahunter
+# Start PostgreSQL + Redis
 docker compose up -d postgres redis
 
-# 3. Backend setup
-cd apps/backend
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-cp ../../.env.example ../../.env # Edit .env with your Gemini and data-provider keys
-python -c "from database import engine; from models.db import Base; Base.metadata.create_all(bind=engine)"
-python ../../scripts/seed_stocks.py
+# Backend
+cd apps/backend && python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt && cp ../../.env.example ../../.env
 uvicorn main:app --reload --port 8000
 
-# 4. Frontend setup (new terminal)
-cd apps/frontend
-npm install
-npm run dev
+# Frontend (new terminal)
+cd apps/frontend && npm install && npm run dev
 ```
+Open <http://localhost:5173> → click **Trigger Market Scan**.
 
-Open http://localhost:5173 and click **Trigger Market Scan** to start.
+### WorldMonitor
+
+```bash
+cd ECo-times-hackathon/worldmonitor
+npm install
+npm run dev        # http://localhost:5173
+```
+No environment variables required for basic operation.
+
+### AIBAA
+
+```bash
+cd "ECo-times-hackathon/AI Investment Banking Analyst Agent (AIBAA)"
+cp .env.example .env   # add GEMINI_API_KEY + AIBAA_JWT_SECRET
+make up                # boots api, web, db, redis, chroma via Docker
+```
+- **API docs:** <http://localhost:8000/docs>
+- **Web app:** <http://localhost:3000>
+
+---
+
+## Tech Stack Summary
+
+| | AlphaHunter | WorldMonitor | AIBAA |
+|---|---|---|---|
+| **Frontend** | React 19, TypeScript, Tailwind 4 | Vanilla TypeScript, Vite | React, Vite, Tailwind |
+| **Backend** | Python 3.11, FastAPI | Node.js sidecar, Vercel Edge | Python 3.11, FastAPI |
+| **Database** | PostgreSQL 15, Redis 7 | Upstash Redis | PostgreSQL 16, Redis 7 |
+| **AI/LLM** | Gemini API | Ollama / Groq / OpenRouter | Gemini API, NVIDIA NIM |
+| **Vector Store** | — | — | ChromaDB |
+| **Maps/Viz** | Recharts | deck.gl, globe.gl, MapLibre GL | — |
+| **Desktop** | — | Tauri 2 (Rust) | — |
+| **Deployment** | Vercel + Railway | Vercel Edge Functions | Docker Compose |
 
 ---
 
 ## Deployment
 
-**Recommended split deployment**
+All three projects support split frontend/backend deployment:
 
-- **Frontend (Vercel)** Root Directory: `alphahunter/apps/frontend`
-- **Backend (Railway)** Root Directory: `alphahunter/apps/backend`
+| Project | Frontend | Backend | Database |
+|---------|----------|---------|----------|
+| AlphaHunter | Vercel (`alphahunter/apps/frontend`) | Railway (single replica) | Railway PostgreSQL |
+| WorldMonitor | Vercel Edge (60+ functions) | Railway relay | Upstash Redis |
+| AIBAA | Vercel (`AIBAA/apps/web`) | Railway | Railway PostgreSQL |
 
-### Vercel
+**Required environment variables per project:**
 
-- The frontend includes `alphahunter/apps/frontend/vercel.json` so React Router paths rewrite to `index.html` instead of returning `404`.
-- Set `VITE_API_BASE_URL=https://<your-railway-backend>/api` in the Vercel project environment variables.
+```bash
+# AlphaHunter
+GEMINI_API_KEY=...
+VITE_API_BASE_URL=https://<railway-backend>/api
+ALLOWED_ORIGINS=https://<vercel-domain>
 
-### Railway
-
-- Set `GEMINI_API_KEY` and optionally `GEMINI_MODEL=gemini-2.5-flash`.
-- Set `ALLOWED_ORIGINS=https://<your-vercel-domain>,https://*.vercel.app`.
-- Keep the backend service at a single replica for now because APScheduler runs in-process.
-
----
-
-## Decision Engine
-
-The confidence score is calculated as:
-
-```
-Confidence = (Signal Score x 0.40) + (Backtest Score x 0.40) + (Signal Count x 0.20)
-```
-
-| Confidence | Action | Meaning |
-|-----------|--------|---------|
-| >= 70% | **BUY** | Strong opportunity with validated history |
-| 50-69% | **WATCH** | Potential — monitor for confirmation |
-| < 50% | **AVOID** | Insufficient evidence |
-
-Each BUY/WATCH recommendation includes: entry price, target price, stop-loss, and risk:reward ratio (targeting 1:2.5).
-
----
-
-## Architecture
-
-```
-┌─────────────┐     ┌─────────────────────────────────────────────┐
-│   React UI  │────▶│              FastAPI Backend                 │
-│  Port 5173  │◀────│              Port 8000                       │
-└─────────────┘     │                                             │
-                    │  ┌─────┐  ┌────────┐  ┌───────────┐        │
-                    │  │Data │─▶│Signal  │─▶│Backtesting│        │
-                    │  │Agent│  │Agent   │  │Agent      │        │
-                    │  └─────┘  └────────┘  └───────────┘        │
-                    │              │              │                │
-                    │         ┌────▼────┐  ┌─────▼─────┐         │
-                    │         │Reasoning│  │ Decision  │         │
-                    │         │Agent    │  │ Agent     │         │
-                    │         └─────────┘  └───────────┘         │
-                    │                           │                 │
-                    │                     ┌─────▼─────┐          │
-                    │                     │  Audit    │          │
-                    │                     │  Agent    │          │
-                    │                     └───────────┘          │
-                    └─────────────────────────────────────────────┘
-                         │                      │
-                    ┌────▼────┐           ┌─────▼─────┐
-                    │PostgreSQL│           │  Redis    │
-                    │  :5432  │           │  :6379    │
-                    └─────────┘           └───────────┘
+# AIBAA
+GEMINI_API_KEY=...
+NVIDIA_API_KEY=...
+AIBAA_JWT_SECRET=...
+DATABASE_URL=postgresql://...
 ```
 
 ---
 
-## Documentation
+## Project Specifications
 
-Comprehensive project specifications are in the [`files/`](files/) directory:
+Comprehensive architecture and design documents in [`files/`](files/):
 
-| # | Document | Description |
-|---|----------|-------------|
-| 01 | Project Overview | Vision, pipeline, tech stack, demo flow |
-| 02 | User Stories | 23 stories across 8 epics with acceptance criteria |
-| 03 | Information Architecture | Navigation, pages, content models, user flows |
-| 04 | System Architecture | 7-agent pipeline, data flow, failure handling |
-| 05 | Database Schema | 10 tables, DDL, indexes, views, migration strategy |
-| 06 | API Contracts | Full REST specification with request/response schemas |
-| 07 | Monorepo Structure | Folder layout, Docker config, naming conventions |
-| 08 | Computation Engine | Mathematical formulas for all signal detection |
-| 09 | Engineering Scope | MVP boundaries, constraints, risk register |
-| 10 | Development Phases | Hour-by-hour hackathon build plan |
-| 11 | Environment & DevOps | Setup, deployment, CI/CD, monitoring |
-| 12 | Testing Strategy | Test types, fixtures, 30+ test case specifications |
+| # | Document |
+|---|----------|
+| 01 | Project Overview — vision, pipeline, demo flow |
+| 02 | User Stories — 23 stories across 8 epics |
+| 03 | Information Architecture — navigation, content models |
+| 04 | System Architecture — agent pipeline, data flow |
+| 05 | Database Schema — 10 tables, DDL, indexes |
+| 06 | API Contracts — full REST specification |
+| 07 | Monorepo Structure — folder layout, Docker config |
+| 08 | Computation Engine — signal detection formulas |
+| 09 | Engineering Scope — MVP boundaries, risk register |
+| 10 | Development Phases — hackathon build plan |
+| 11 | Environment & DevOps — setup, CI/CD, monitoring |
+| 12 | Testing Strategy — 30+ test case specifications |
 
 ---
 
 ## License
 
-Built for the ECo Times Hackathon.
+| Project | License |
+|---------|---------|
+| AlphaHunter | Built for the ECo Times Hackathon |
+| WorldMonitor | [AGPL-3.0](worldmonitor/LICENSE) — commercial use requires a separate license |
+| AIBAA | MIT |
+
+---
+
+<div align="center">
+
+Built for the **ECo Times Hackathon 2026**
+
+</div>
