@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package worldmonitor.intelligence.v1;
+
+message DeductSituationRequest {
+  string query = 1;
+  string geo_context = 2;
+}
+
+message DeductSituationResponse {
+  string analysis = 1;
+  string model = 2;
+  string provider = 3;
+  WebVerification web_verification = 4;
+  SignalDiagnostics signal_diagnostics = 5;
+}
+
+message VerificationEvidence {
+  string statement = 1;
+  string source = 2;
+  string source_url = 3;
+  string observed_at = 4;
+  double confidence = 5;
+  repeated string quote_spans = 6;
+}
+
+message WebVerification {
+  string status = 1;
+  double confidence_delta = 2;
+  int32 evidence_count = 3;
+  repeated VerificationEvidence top_evidence = 4;
+}
+
+message SignalDiagnostics {
+  string mode = 1;
+  string provider_status = 2;
+  bool fallback_used = 3;
+  bool stale_data = 4;
+  string reason = 5;
+}

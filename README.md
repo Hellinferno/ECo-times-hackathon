@@ -10,7 +10,7 @@
 
 **One monorepo. Three AI-powered platforms. Built for the ECo Times Hackathon.**
 
-[AlphaHunter](#-alphahunter-ai) · [WorldMonitor](#-worldmonitor) · [AIBAA](#-aibaa) · [Quick Start](#-quick-start) · [Deployment](#-deployment)
+[AlphaHunter](#-alphahunter-ai) · [EcoMonitor](#-ecomonitor) · [AIBAA](#-aibaa) · [Quick Start](#-quick-start) · [Deployment](#-deployment)
 
 </div>
 
@@ -44,11 +44,11 @@ AlphaHunter continuously monitors **100+ NSE-listed stocks**, detects trading op
 
 ---
 
-### WorldMonitor
+### EcoMonitor
 
 > **Real-Time Global Intelligence Dashboard**
 
-[![Docs](https://img.shields.io/badge/README-worldmonitor%2F-blue?style=flat)](worldmonitor/README.md)
+[![Docs](https://img.shields.io/badge/README-ecomonitor%2F-blue?style=flat)](ecomonitor/README.md)
 [![Live](https://img.shields.io/badge/Live-worldmonitor.app-green?style=flat)](https://worldmonitor.app)
 [![Stack](https://img.shields.io/badge/TypeScript_+_Tauri_+_deck.gl-stack-informational?style=flat)]()
 
@@ -65,7 +65,7 @@ WorldMonitor is a sophisticated situational awareness platform aggregating **435
 
 **Tech:** Vanilla TypeScript · Vite · globe.gl · deck.gl · MapLibre GL · Tauri 2 (Rust) · Ollama · Convex · Protocol Buffers
 
-→ [Full documentation](worldmonitor/README.md) · [Live app](https://worldmonitor.app)
+→ [Full documentation](ecomonitor/README.md) · [Live app](https://worldmonitor.app)
 
 ---
 
@@ -133,11 +133,13 @@ ECo-times-hackathon/
 │   ├── Makefile
 │   └── README.md                         ← AlphaHunter documentation
 │
-├── worldmonitor/                         # WorldMonitor — global intelligence dashboard
-│   ├── src/                              # Vanilla TypeScript + deck.gl
+├── ecomonitor/                          # EcoMonitor — global intelligence dashboard
+│   ├── src/                              # Vite TypeScript app (apps/web/)
+│   ├── apps/
+│   │   └── web/                          # Vite TypeScript app (src/, server/)
 │   ├── src-tauri/                        # Rust desktop app
 │   ├── vercel.json
-│   └── README.md                         ← WorldMonitor documentation
+│   └── README.md                         ← EcoMonitor documentation
 │
 ├── AI Investment Banking Analyst Agent (AIBAA)/   # AIBAA — investment banking AI
 │   ├── apps/
@@ -179,10 +181,10 @@ cd apps/frontend && npm install && npm run dev
 ```
 Open <http://localhost:5173> → click **Trigger Market Scan**.
 
-### WorldMonitor
+### EcoMonitor
 
 ```bash
-cd ECo-times-hackathon/worldmonitor
+cd ECo-times-hackathon/ecomonitor
 npm install
 npm run dev        # http://localhost:5173
 ```
@@ -268,7 +270,7 @@ Comprehensive architecture and design documents in [`files/`](files/):
 | Project | License |
 |---------|---------|
 | AlphaHunter | Built for the ECo Times Hackathon |
-| WorldMonitor | [AGPL-3.0](worldmonitor/LICENSE) — commercial use requires a separate license |
+| WorldMonitor | [AGPL-3.0](ecomonitor/LICENSE) — commercial use requires a separate license |
 | AIBAA | MIT |
 
 ---
