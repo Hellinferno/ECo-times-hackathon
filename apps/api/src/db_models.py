@@ -46,6 +46,8 @@ class DocumentModel(Base):
     parsed_text = Column(String, nullable=True)
     parse_status = Column(String, default="pending")
     rag_status = Column(String, default="pending")
+    rag_indexed_at = Column(DateTime, nullable=True)
+    rag_error = Column(String, nullable=True)
     uploaded_at = Column(DateTime, default=_utcnow)
     
     deal = relationship("DealModel", back_populates="documents")

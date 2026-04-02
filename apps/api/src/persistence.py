@@ -42,6 +42,9 @@ def _document_from_model(model: DocumentModel) -> Document:
         doc_category=model.doc_category,
         parsed_text=model.parsed_text,
         parse_status=model.parse_status,
+        rag_status=model.rag_status,
+        rag_indexed_at=model.rag_indexed_at,
+        rag_error=model.rag_error,
         uploaded_at=model.uploaded_at,
     )
 

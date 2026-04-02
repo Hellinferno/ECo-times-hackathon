@@ -35,13 +35,21 @@ async def shutdown(ctx: dict) -> None:
     logger.info("Worker stopped")
 
 
+async def run_rag_indexing(ctx: dict, document_id: str, deal_id: str) -> None:
+    """ARQ task: ingest a parsed document into the vector store."""
+    from rag.indexing import perform_rag_indexing
+
+    success = perform_rag_indexing(document_id, deal_id)
+    logger.info("run_rag_indexing: doc=%s status=%s", document_id, "indexed" if success else "failed")
+
+
 class WorkerSettings:
     """ARQ worker settings — discovered by arq CLI."""
 
     redis_settings = None  # Set dynamically below
     on_startup = startup
     on_shutdown = shutdown
-    functions: list = []  # Register task functions here as needed
+    functions: list = [run_rag_indexing]
     max_jobs = 4
 
 

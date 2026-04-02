@@ -2,7 +2,7 @@ import os
 from threading import Lock
 
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -30,6 +30,25 @@ _schema_ready = False
 _schema_lock = Lock()
 
 
+def _ensure_nullable_column(table_name: str, column_name: str, ddl: str) -> None:
+    inspector = inspect(engine)
+    if table_name not in inspector.get_table_names():
+        return
+
+    existing = {col["name"] for col in inspector.get_columns(table_name)}
+    if column_name in existing:
+        return
+
+    with engine.begin() as conn:
+        conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {ddl}"))
+
+
+def _ensure_schema_compatibility() -> None:
+    """Apply lightweight additive schema fixes for local/dev databases."""
+    _ensure_nullable_column("documents", "rag_indexed_at", "DATETIME")
+    _ensure_nullable_column("documents", "rag_error", "VARCHAR")
+
+
 def ensure_database_ready() -> None:
     """Create tables lazily for direct module/test usage outside FastAPI startup."""
     global _schema_ready
@@ -42,6 +61,7 @@ def ensure_database_ready() -> None:
         import db_models  # noqa: F401 - ensure metadata is registered before create_all
 
         Base.metadata.create_all(bind=engine)
+        _ensure_schema_compatibility()
         _schema_ready = True
 
 def get_db():

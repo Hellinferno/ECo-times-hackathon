@@ -214,6 +214,9 @@ class ModelRegistryEntryResponse(BaseModel):
     config: Dict[str, Any] = Field(default_factory=dict)
     validation_status: ValidationStatusStr = "pending"
     validation_report: Dict[str, Any] = Field(default_factory=dict)
+    eval_summary: Dict[str, Any] = Field(default_factory=dict)
+    canary_status: str = "pending"
+    rollout_notes: str = ""
     rollback_from_id: Optional[str] = None
     created_by: Optional[str] = None
     promoted_at: Optional[str] = None

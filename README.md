@@ -29,7 +29,9 @@
 
 **AIBAA** (AI Investment Banking Analyst Agent) is an enterprise-grade financial analysis platform built on a sophisticated Multi-Agent architecture. It leverages foundational models to automate complex, time-consuming investment banking tasks.
 
-The current version represents **Version 1.0 (Alpha)** with core infrastructure, authentication APIs, and the financial modeling engine foundation (DCF and LBO) complete.
+The current version represents **Version 1.0 (Alpha)** with core infrastructure, authentication APIs, financial modeling foundations, and a hardened Phase 2 agent layer that now includes auditable RAG state, prompt-safety controls, and model-registry governance.
+
+See [`CHANGELOG.md`](CHANGELOG.md) for the release summary and verification commands for the latest Phase 2 hardening update.
 
 ---
 
@@ -38,7 +40,10 @@ The current version represents **Version 1.0 (Alpha)** with core infrastructure,
 ### Orchestrator & Multi-Agent Framework
 
 - **Task Routing:** Routes queries to six specialized AI agents: Financial Modeling, Pitchbook, Due Diligence, Market Research, Doc Drafter, Coordination
-- **RAG Pipeline (WIP):** Semantic chunking and vector retrieval context via ChromaDB
+- **RAG Pipeline:** Semantic chunking, background indexing, retrieval context via ChromaDB, and explicit `pending -> indexing -> indexed/failed` document state
+- **Traceable Agent Runs:** Agent responses now carry prompt version, registry metadata, guard events, and retrieved chunk references
+- **Prompt Safety Controls:** Prompt-guard sanitization runs on user input and retrieved document context, with audit logging for suspicious content
+- **Registry Governance:** Admin endpoints support model staging, validation, promotion, rollback, and eval-report retrieval
 
 ### Advanced Financial Engines
 
@@ -50,6 +55,7 @@ The current version represents **Version 1.0 (Alpha)** with core infrastructure,
 
 - **FastAPI Foundation:** Performant API layer with dependency-injected auth, idempotency, and security headers
 - **Database:** SQLAlchemy + Alembic (SQLite for dev, PostgreSQL for production)
+- **Workflow State:** Database-backed document lifecycle with worker-driven indexing jobs and recovery-safe startup handling
 - **Docker Ready:** Composable microservices — `api`, `web`, `db`, `redis`, `chroma`
 
 ---
@@ -95,8 +101,8 @@ The current version represents **Version 1.0 (Alpha)** with core infrastructure,
 ### Clone Repository
 
 ```bash
-git clone https://github.com/Hellinferno/ECo-times-hackathon.git
-cd "ECo-times-hackathon/AI Investment Banking Analyst Agent (AIBAA)"
+git clone https://github.com/Hellinferno/Investment-banking-analyst-.git
+cd "Investment-banking-analyst-"
 ```
 
 ### Option 1: Docker (recommended)
@@ -165,8 +171,8 @@ NVIDIA_API_KEY=your_nvidia_nim_key
 ## Roadmap
 
 - **Phase 0:** Foundation, Auth & Infrastructure — *Completed*
-- **Phase 1:** Core Backend + Data Layer — *In Progress*
-- **Phase 2:** RAG Pipeline + Agent Framework — *Stubbed*
+- **Phase 1:** Core Backend + Data Layer — *Completed*
+- **Phase 2:** RAG Pipeline + Agent Framework - *Completed with hardening* (background indexing, prompt guards, traceability, registry admin, eval hooks)
 - **Phase 3:** Computation Engine + First Agent — *DCF/LBO Built*
 - **Phase 4:** Full Agent Suite + PDF/Word Generation
 - **Phase 5:** Complete Frontend Workflows
@@ -174,3 +180,4 @@ NVIDIA_API_KEY=your_nvidia_nim_key
 ---
 
 ← [Back to suite overview](../README.md)
+

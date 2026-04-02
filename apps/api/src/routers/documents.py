@@ -11,9 +11,10 @@ from sqlalchemy.orm import Session
 
 from database import SessionLocal
 from db_models import DocumentModel
-from dependencies import get_current_user, get_db
+from dependencies import UserContext, get_current_user, get_db
 from models import APIResponse, Meta
 from persistence import get_deal_for_user, sync_document_to_store
+from rag.indexing import schedule_rag_indexing, update_document_rag_state
 from store import store
 from tools.document_parser import parse_document
 
@@ -60,7 +61,17 @@ def _parse_document_async(file_id: str, file_path: str, file_type: str) -> None:
             db_doc.parsed_text = parsed_text
             db_doc.parse_status = "parsed" if parsed_text else "parse_failed"
             db.commit()
+            db.refresh(db_doc)
             sync_document_to_store(db_doc)
+            if parsed_text:
+                schedule_rag_indexing(file_id, db_doc.deal_id)
+            else:
+                update_document_rag_state(
+                    file_id,
+                    status="failed",
+                    rag_error="Document parsing failed.",
+                    rag_indexed_at=None,
+                )
     except Exception as exc:
         doc = store.documents.get(file_id)
         if doc:
@@ -70,7 +81,14 @@ def _parse_document_async(file_id: str, file_path: str, file_type: str) -> None:
         if db_doc:
             db_doc.parse_status = "parse_failed"
             db.commit()
+            db.refresh(db_doc)
             sync_document_to_store(db_doc)
+            update_document_rag_state(
+                file_id,
+                status="failed",
+                rag_error="Document parsing failed.",
+                rag_indexed_at=None,
+            )
         logger.exception("Document parsing failed for %s", file_id, exc_info=exc)
     finally:
         db.close()
@@ -98,7 +116,7 @@ async def upload_documents(
     files: List[UploadFile] = File(...),
     category: Optional[str] = Form(None),
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: UserContext = Depends(get_current_user),
 ):
     deal = get_deal_for_user(db, deal_id, current_user["tenant_id"])
     if not deal:
@@ -172,6 +190,9 @@ async def upload_documents(
             "file_type": db_doc.file_type,
             "file_size_bytes": db_doc.file_size_bytes,
             "parse_status": db_doc.parse_status,
+            "rag_status": db_doc.rag_status,
+            "rag_indexed_at": db_doc.rag_indexed_at.isoformat() if db_doc.rag_indexed_at else None,
+            "rag_error": db_doc.rag_error,
             "uploaded_at": db_doc.uploaded_at.isoformat(),
         })
 
@@ -190,7 +211,7 @@ async def upload_documents(
 async def list_documents(
     deal_id: str,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: UserContext = Depends(get_current_user),
 ):
     deal = get_deal_for_user(db, deal_id, current_user["tenant_id"])
     if not deal:
@@ -215,6 +236,9 @@ async def list_documents(
                 "file_size_bytes": d.file_size_bytes,
                 "doc_category": d.doc_category,
                 "parse_status": d.parse_status,
+                "rag_status": d.rag_status,
+                "rag_indexed_at": d.rag_indexed_at.isoformat() if d.rag_indexed_at else None,
+                "rag_error": d.rag_error,
                 "uploaded_at": d.uploaded_at.isoformat(),
             }
             for d in docs
@@ -228,7 +252,7 @@ async def delete_document(
     deal_id: str,
     doc_id: str,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: UserContext = Depends(get_current_user),
 ):
     deal = get_deal_for_user(db, deal_id, current_user["tenant_id"])
     if not deal:

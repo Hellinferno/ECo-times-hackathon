@@ -31,7 +31,16 @@ class RuntimeModelConfig:
     config: dict[str, Any]
 
 
+def _normalize_registry_config(config: dict[str, Any] | None) -> dict[str, Any]:
+    normalized = dict(config or {})
+    normalized.setdefault("eval_summary", {})
+    normalized.setdefault("canary_status", "pending")
+    normalized.setdefault("rollout_notes", "")
+    return normalized
+
+
 def serialize_registry_entry(entry: ModelRegistryModel) -> dict[str, Any]:
+    config = _normalize_registry_config(entry.config or {})
     return {
         "id": entry.id,
         "tenant_id": entry.tenant_id,
@@ -40,9 +49,12 @@ def serialize_registry_entry(entry: ModelRegistryModel) -> dict[str, Any]:
         "model_name": entry.model_name,
         "prompt_version": entry.prompt_version,
         "status": entry.status,
-        "config": entry.config or {},
+        "config": config,
         "validation_status": entry.validation_status or "pending",
         "validation_report": entry.validation_report or {},
+        "eval_summary": config.get("eval_summary", {}),
+        "canary_status": config.get("canary_status", "pending"),
+        "rollout_notes": config.get("rollout_notes", ""),
         "rollback_from_id": entry.rollback_from_id,
         "created_by": entry.created_by,
         "promoted_at": entry.promoted_at.isoformat() if entry.promoted_at else None,
@@ -66,7 +78,7 @@ def _build_default_entry(tenant_id: str | None, purpose: str, created_by: str | 
         model_name=DEFAULT_MODEL_NAME,
         prompt_version=DEFAULT_PROMPT_VERSION,
         status="active",
-        config={},
+        config=_normalize_registry_config({}),
         validation_status=report["overall_status"],
         validation_report=report,
         created_by=created_by or "bootstrap",
@@ -125,7 +137,7 @@ def get_active_runtime_config(
         provider=entry.provider,
         model_name=entry.model_name,
         prompt_version=entry.prompt_version,
-        config=entry.config or {},
+        config=_normalize_registry_config(entry.config or {}),
     )
 
 
@@ -179,6 +191,19 @@ def validate_registry_candidate(
         "Registry config must be a JSON object.",
         type(config).__name__,
     )
+    normalized_config = _normalize_registry_config(config if isinstance(config, dict) else {})
+    add_check(
+        "eval_summary_present",
+        isinstance(normalized_config.get("eval_summary"), dict),
+        "Eval summary must be an object when supplied.",
+        type(normalized_config.get("eval_summary")).__name__,
+    )
+    add_check(
+        "canary_status_present",
+        isinstance(normalized_config.get("canary_status"), str),
+        "Canary status must be a string.",
+        normalized_config.get("canary_status"),
+    )
 
     fixture_report = {
         "name": "extraction_contract_fixture",
@@ -226,7 +251,7 @@ def stage_registry_entry(
         model_name=model_name.strip(),
         prompt_version=prompt_version.strip(),
         status="staged",
-        config=config or {},
+        config=_normalize_registry_config(config or {}),
         validation_status=report["overall_status"],
         validation_report=report,
         created_by=created_by,

@@ -82,6 +82,9 @@ class Document:
     doc_category: Optional[str] = None
     parsed_text: Optional[str] = None
     parse_status: str = "pending"
+    rag_status: str = "pending"
+    rag_indexed_at: Optional[datetime] = None
+    rag_error: Optional[str] = None
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     uploaded_at: datetime = field(default_factory=_utcnow)
 

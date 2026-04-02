@@ -57,6 +57,13 @@ def _serialize_run(run_record) -> dict:
         "steps": _sanitize_reasoning_steps(run_record.reasoning_steps),
         "valuation_result": payload.get("valuation_result"),
         "lbo_result": payload.get("lbo_result"),
+        "rag_chunks_used": payload.get("rag_chunks_used", []),
+        "guard_events": payload.get("guard_events", []),
+        "registry_id": payload.get("registry_id"),
+        "eval_status": payload.get("eval_status", "pending"),
+        "prompt_version": run_record.prompt_version,
+        "model_provider": run_record.model_provider,
+        "model_name": run_record.model_name,
         "error_message": run_record.error_message,
         "confidence_score": run_record.confidence_score,
     }
@@ -252,6 +259,12 @@ async def dispatch_agent(
             specialized_payload = payload.model_dump()
             specialized_payload["agent_type"] = target_agent
             specialized_payload["task_name"] = target_task
+            specialized_payload["request_context"] = {
+                "tenant_id": current_user["tenant_id"],
+                "user_id": current_user["user_id"],
+                "role": current_user["role"],
+                "email": current_user.get("email"),
+            }
             specialized_agent = AGENT_DISPATCH_MAP[route_key](deal_id, specialized_payload)
             with SessionLocal() as persist_db:
                 persist_run_bundle(persist_db, specialized_agent.run_id)
@@ -303,6 +316,8 @@ async def list_agent_runs(
                     "agent_type": r.agent_type,
                     "task_name": r.task_name,
                     "status": r.status,
+                    "registry_id": (r.input_payload or {}).get("registry_id"),
+                    "eval_status": (r.input_payload or {}).get("eval_status", "pending"),
                     "created_at": r.created_at.isoformat(),
                 }
                 for r in runs
@@ -345,6 +360,13 @@ async def get_agent_run(
             "steps": [],
             "valuation_result": (db_run.input_payload or {}).get("valuation_result"),
             "lbo_result": (db_run.input_payload or {}).get("lbo_result"),
+            "rag_chunks_used": (db_run.input_payload or {}).get("rag_chunks_used", []),
+            "guard_events": (db_run.input_payload or {}).get("guard_events", []),
+            "registry_id": (db_run.input_payload or {}).get("registry_id"),
+            "eval_status": (db_run.input_payload or {}).get("eval_status", "pending"),
+            "prompt_version": db_run.prompt_version,
+            "model_provider": db_run.model_provider,
+            "model_name": db_run.model_name,
             "error_message": db_run.error_message,
             "confidence_score": db_run.confidence_score,
             "route": (db_run.input_payload or {}).get("route_decision", {}),

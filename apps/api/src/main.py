@@ -20,18 +20,20 @@ from pydantic_settings import BaseSettings
 
 from logging_config import configure_logging, get_logger
 from middleware import IdempotencyMiddleware, get_limiter
-from database import Base, SessionLocal, engine
+from database import Base, SessionLocal, engine, ensure_database_ready
 from db_models import DealModel, DocumentModel
 from persistence import hydrate_store_from_db, sync_deal_to_store, sync_document_to_store
+from rag.indexing import schedule_rag_indexing, update_document_rag_state
 from routers import agents, auth, deals, documents, outputs, tasks
 from routers.admin import router as admin_router
 from routers.webhooks import router as webhooks_router
+from routers.world_monitor import router as world_monitor_router
 
 configure_logging()
 logger = get_logger(__name__)
 
 # Ensure database tables are created synchronously on startup
-Base.metadata.create_all(bind=engine)
+ensure_database_ready()
 
 
 class Settings(BaseSettings):
@@ -110,6 +112,7 @@ app.include_router(auth.router, prefix="/api/v1")
 app.include_router(tasks.router, prefix="/api/v1")
 app.include_router(admin_router, prefix="/api/v1")
 app.include_router(webhooks_router, prefix="/api/v1")
+app.include_router(world_monitor_router, prefix="/api/v1")
 
 
 @app.get("/api/v1/health", tags=["Health"])
@@ -129,7 +132,7 @@ _parse_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="doc-pars
 
 
 def _parse_in_thread(doc_id: str) -> None:
-    """Parse a single document in a background thread; update store in-place."""
+    """Parse a single document and schedule RAG indexing."""
     from store import store
     from tools.document_parser import parse_document
 
@@ -148,8 +151,20 @@ def _parse_in_thread(doc_id: str) -> None:
             db_doc.parsed_text = text
             db_doc.parse_status = doc.parse_status
             db.commit()
+            db.refresh(db_doc)
+            sync_document_to_store(db_doc)
     finally:
         db.close()
+
+    if text:
+        schedule_rag_indexing(doc_id, doc.deal_id or "")
+    else:
+        update_document_rag_state(
+            doc_id,
+            status="failed",
+            rag_error="Document parsing failed.",
+            rag_indexed_at=None,
+        )
 
 
 @app.on_event("startup")
@@ -163,7 +178,7 @@ async def _recover_uploads() -> None:
     from store import store
     from store import Deal, Document
 
-    Base.metadata.create_all(bind=engine)
+    ensure_database_ready()
     db = SessionLocal()
     hydrate_store_from_db(db)
 

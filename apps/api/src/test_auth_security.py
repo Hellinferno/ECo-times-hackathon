@@ -1,5 +1,11 @@
+import os
 import sys
 import uuid
+
+# Set required env vars before importing the app so AuthSettings initialises
+os.environ.setdefault("AIBAA_JWT_SECRET", "test-jwt-secret-for-ci-only")
+os.environ.setdefault("AIBAA_DEMO_PASSWORD", "testpass-ci")
+os.environ.setdefault("AIBAA_ENVIRONMENT", "development")
 
 from fastapi.testclient import TestClient
 
@@ -7,22 +13,26 @@ sys.path.insert(0, ".")
 
 from database import SessionLocal, ensure_database_ready
 from db_models import DealModel, OutputModel
-from dependencies import get_auth_settings
+from dependencies import create_access_token, get_auth_settings, get_demo_users
 from main import app
 
 
 client = TestClient(app)
-DEV_BOOTSTRAP_TOKEN = "dev-local-token"
 
 
 def _issue_token(role: str) -> str:
-    response = client.post(
-        "/api/v1/auth/dev-token",
-        json={"requested_role": role},
-        headers={"X-Dev-API-Token": DEV_BOOTSTRAP_TOKEN},
+    """Issue a JWT for the given demo role directly via create_access_token."""
+    settings = get_auth_settings()
+    users = get_demo_users(settings)
+    user = users[role]
+    token, _ = create_access_token(
+        user_id=user["user_id"],
+        tenant_id=user["tenant_id"],
+        role=user["role"],
+        email=user["email"],
+        settings=settings,
     )
-    assert response.status_code == 200, response.text
-    return response.json()["data"]["access_token"]
+    return token
 
 
 def _auth_headers(token: str) -> dict[str, str]:
@@ -32,14 +42,16 @@ def _auth_headers(token: str) -> dict[str, str]:
 def _seed_output() -> tuple[str, str]:
     ensure_database_ready()
     settings = get_auth_settings()
+    users = get_demo_users(settings)
+    analyst = users["analyst"]
     deal_id = str(uuid.uuid4())
     output_id = str(uuid.uuid4())
     with SessionLocal() as db:
         db.add(
             DealModel(
                 id=deal_id,
-                tenant_id=settings.default_tenant_id,
-                owner_id=settings.default_user_id,
+                tenant_id=analyst["tenant_id"],
+                owner_id=analyst["user_id"],
                 name=f"Auth Test {deal_id[:8]}",
                 company_name="Role Gating Co",
                 deal_type="other",
@@ -66,12 +78,16 @@ def _seed_output() -> tuple[str, str]:
 
 
 def test_auth_me_returns_claims_from_jwt():
+    settings = get_auth_settings()
+    users = get_demo_users(settings)
+    analyst = users["analyst"]
+
     token = _issue_token("analyst")
     response = client.get("/api/v1/auth/me", headers=_auth_headers(token))
     assert response.status_code == 200
     payload = response.json()["data"]
-    assert payload["user_id"] == get_auth_settings().default_user_id
-    assert payload["tenant_id"] == get_auth_settings().default_tenant_id
+    assert payload["user_id"] == analyst["user_id"]
+    assert payload["tenant_id"] == analyst["tenant_id"]
     assert payload["role"] == "analyst"
 
 

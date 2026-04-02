@@ -16,6 +16,7 @@ from engine.financial_statement_analyzer import FinancialStatementAnalyzer
 from tools.document_parser import extract_structured_financials
 from tools.excel_writer import WorkbookBuilder
 from store import store, Output, ExtractionAudit
+from security.prompt_guard import sanitize_payload_strings
 
 
 class FinancialModelingAgent(BaseAgent):
@@ -86,6 +87,28 @@ class FinancialModelingAgent(BaseAgent):
             return cast(default), f"{name}: generic default"
 
         return None, f"{name}: missing"
+
+    def _fetch_wm_wacc_inputs(self) -> dict:
+        """Fetch live risk-free rate and ERP from WorldMonitor.
+
+        Returns a dict with optional keys ``risk_free_rate`` and
+        ``equity_risk_premium``.  Returns ``{}`` on any failure so the
+        existing hardcoded fallbacks take over.
+        """
+        try:
+            from tools.world_monitor import wm_client
+            if not wm_client.enabled:
+                return {}
+            result: dict = {}
+            rfr = wm_client.get_risk_free_rate_sync()
+            if rfr is not None and 0.01 <= rfr <= 0.15:
+                result["risk_free_rate"] = rfr
+            spreads = wm_client.get_credit_spreads_sync()
+            if spreads and spreads.hy_spread and 0.02 <= spreads.hy_spread <= 0.15:
+                result["equity_risk_premium"] = spreads.hy_spread
+            return result
+        except Exception:
+            return {}
 
     @staticmethod
     def _parse_llm_response(raw: str) -> dict:
@@ -989,6 +1012,36 @@ class FinancialModelingAgent(BaseAgent):
         }
 
     @staticmethod
+    def _fetch_web_sector_multiples(self, industry: str) -> dict | None:
+        """Fetch live sector valuation multiples via TinyFish web agent."""
+        try:
+            from tools.web_agent import web_agent
+            if not web_agent.enabled or not industry:
+                return None
+
+            result = web_agent.fetch_sector_multiples_sync(industry)
+            if not result.success or not result.data:
+                return None
+
+            data = result.data if isinstance(result.data, dict) else {}
+            ev_ebitda = data.get("ev_ebitda")
+            if ev_ebitda is None:
+                return None
+
+            base = float(ev_ebitda)
+            bear = round(base * 0.75, 1)
+            bull = round(base * 1.25, 1)
+            industry_name = data.get("industry_name", industry).lower()
+
+            self.observe(
+                f"TinyFish live comps: {industry_name} EV/EBITDA "
+                f"bear={bear}x base={base}x bull={bull}x"
+            )
+            return {"sector_multiples": {industry_name: (bear, base, bull)}}
+        except Exception as exc:
+            logger.debug("TinyFish sector multiples fetch failed: %s", exc)
+            return None
+
     def _build_synthesis_summary(
         dcf_header: dict,
         comps_snapshot: dict,
@@ -1039,12 +1092,35 @@ class FinancialModelingAgent(BaseAgent):
         context = self._extract_document_context()
         self.observe(f"Extracted {len(context)} characters of document context.")
 
-        params = self.input_payload.get("parameters", {})
+        request_context = self.input_payload.get("request_context", {}) or {}
+        tenant_id = request_context.get("tenant_id")
+        user_id = request_context.get("user_id")
+        guard_result = sanitize_payload_strings(
+            self.input_payload.get("parameters", {}),
+            source_prefix="agent_parameters",
+            tenant_id=tenant_id,
+            user_id=user_id,
+            resource_type="deal",
+            resource_id=self.deal_id,
+            block_policy="block",
+        )
+        params = guard_result["value"]
+        guard_events = list(guard_result["events"])
+        self.update_payload("guard_events", guard_events)
+        if guard_result["blocked"]:
+            self.fail("Prompt guard blocked suspicious agent parameters.")
+            return self.run_id
+
         deal = store.get_deal(self.deal_id)
         deal_name = deal.name if deal else "Unknown Deal"
         company_name = deal.company_name if deal else "the target company"
         deal_industry = getattr(deal, "industry", "") if deal else ""
-        has_uploaded_documents = bool(store.get_documents_for_deal(self.deal_id))
+        parsed_docs = [
+            doc for doc in store.get_documents_for_deal(self.deal_id)
+            if getattr(doc, "parse_status", "") == "parsed"
+        ]
+        has_uploaded_documents = bool(parsed_docs)
+        primary_document_id = parsed_docs[0].id if parsed_docs else None
 
         context_header = f"CRITICALLY IMPORTANT: The target company is {company_name} (Deal: {deal_name}).\n"
         context_header += "1. Do not extract data for any other entity.\n"
@@ -1116,6 +1192,10 @@ class FinancialModelingAgent(BaseAgent):
                         document_context=current_context,
                         params=params,
                         company_name=company_name,
+                        document_id=primary_document_id,
+                        deal_id=self.deal_id,
+                        tenant_id=tenant_id,
+                        user_id=user_id,
                     )
                     attempt_data = attempt_output.get("extracted_data", {})
                     attempt_audit = attempt_output.get("audit_trail", [])
@@ -1156,6 +1236,26 @@ class FinancialModelingAgent(BaseAgent):
                 extraction_mode = best_payload["extraction_mode"]
                 fallback_mode = str(extraction_mode).lower() == "deterministic_fallback"
                 fallback_profile = str(llm_data.get("fallback_profile", ""))
+                preparer_guard_events = preparer_output.get("guard_events", [])
+                if preparer_guard_events:
+                    guard_events.extend(preparer_guard_events)
+                    self.update_payload("guard_events", guard_events)
+                rag_chunks_used = preparer_output.get("rag_chunks_used", [])
+                self.update_payload("rag_chunks_used", rag_chunks_used)
+                self.update_payload("registry_id", preparer_output.get("registry_id"))
+                self.update_payload("eval_status", preparer_output.get("eval_status", "pending"))
+                runtime_meta = preparer_output.get("model_runtime", {})
+                if runtime_meta:
+                    self.set_run_metadata(
+                        model_provider=runtime_meta.get("provider"),
+                        model_name=runtime_meta.get("model_name"),
+                        prompt_version=runtime_meta.get("prompt_version"),
+                    )
+                if preparer_output.get("context_source") == "rag" and rag_chunks_used:
+                    self._log_step(
+                        "rag_retrieval",
+                        f"Retrieved {len(rag_chunks_used)} ranked chunks from the vector store for deal {self.deal_id}.",
+                    )
                 self.observe(
                     f"Selected extraction payload with quality={best_payload['quality']['quality_score']:.2f} "
                     f"(threshold={quality_threshold:.2f})."
@@ -1529,6 +1629,21 @@ class FinancialModelingAgent(BaseAgent):
                 data_sources.append(
                     f"terminal_growth_rate: industry premium +{tgr_premium * 100:.1f}% applied "
                     f"-> {terminal_growth_rate * 100:.2f}%"
+                )
+
+            # --- WorldMonitor live WACC inputs (optional) ---
+            wm_wacc = self._fetch_wm_wacc_inputs()
+            if wm_wacc.get("risk_free_rate"):
+                generic_defaults["risk_free_rate"] = wm_wacc["risk_free_rate"]
+                data_sources.append(
+                    f"risk_free_rate: WorldMonitor DGS10 live "
+                    f"({wm_wacc['risk_free_rate']:.4f})"
+                )
+            if wm_wacc.get("equity_risk_premium"):
+                generic_defaults["equity_risk_premium"] = wm_wacc["equity_risk_premium"]
+                data_sources.append(
+                    f"equity_risk_premium: WorldMonitor HY credit-spread proxy "
+                    f"({wm_wacc['equity_risk_premium']:.4f})"
                 )
 
             risk_free_rate, _ = self._resolve("risk_free_rate", params, llm_data, generic_defaults, label="risk_free_rate")
@@ -2138,6 +2253,11 @@ class FinancialModelingAgent(BaseAgent):
                 "bull": 0.25,
             }
 
+            # Fetch live sector multiples from TinyFish (opt-in)
+            live_comps_data = None
+            if params.get("web_enrichment"):
+                live_comps_data = self._fetch_web_sector_multiples(deal_industry)
+
             self.think("Running parallel workers for DCF/scenario/comps/financial-statement/Monte Carlo analysis.")
             with ThreadPoolExecutor(max_workers=5) as pool:
                 scenario_future = pool.submit(
@@ -2156,6 +2276,7 @@ class FinancialModelingAgent(BaseAgent):
                     shares_for_valuation,
                     deal_industry,
                     is_private_company,
+                    live_comps_data,
                 )
                 dcf_worker_future = pool.submit(
                     lambda: {
