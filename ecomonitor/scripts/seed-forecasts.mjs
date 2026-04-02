@@ -11993,9 +11993,10 @@ function buildSimulationPackageEntities(selectedTheaters, candidates, actorRegis
   const allForecastIdSet = new Set(candidates.flatMap((c) => c.sourceSituationIds || []));
   for (const actor of (actorRegistry || [])) {
     if (!(actor.forecastIds || []).some((id) => allForecastIdSet.has(id))) continue;
+    const safeActorName = sanitizeEntityLabel(actor.name) || 'unknown actor';
     addEntity(`registry:${actor.id}`, {
       entityId: actor.id,
-      name: actor.name,
+      name: safeActorName,
       class: mapActorCategoryToEntityClass(actor.category || 'state', actor.domains || []),
       region: actor.regions?.[0] || candidates[0]?.dominantRegion || '',
       stance: 'active',
@@ -12007,11 +12008,13 @@ function buildSimulationPackageEntities(selectedTheaters, candidates, actorRegis
 
   for (const candidate of candidates) {
     for (const actorName of (candidate.stateSummary?.actors || [])) {
-      const key = `su:${actorName}:${candidate.candidateStateId}`;
+      const safeName = sanitizeEntityLabel(actorName);
+      if (!safeName) continue;
+      const key = `su:${safeName}:${candidate.candidateStateId}`;
       addEntity(key, {
-        entityId: `${candidate.candidateStateId}:${actorName.toLowerCase().replace(/\W+/g, '_')}`,
-        name: actorName,
-        class: inferEntityClassFromName(actorName),
+        entityId: `${candidate.candidateStateId}:${safeName.toLowerCase().replace(/\W+/g, '_')}`,
+        name: safeName,
+        class: inferEntityClassFromName(safeName),
         region: candidate.dominantRegion || '',
         stance: 'active',
         objectives: [],
@@ -12025,11 +12028,13 @@ function buildSimulationPackageEntities(selectedTheaters, candidates, actorRegis
       const match = entry.text.match(/^(.+?)\s+remain the lead actors/i);
       if (!match) continue;
       for (const name of match[1].split(/,\s*/).filter(Boolean)) {
-        const key = `ev:${name}:${candidate.candidateStateId}`;
+        const safeName = sanitizeEntityLabel(name);
+        if (!safeName) continue;
+        const key = `ev:${safeName}:${candidate.candidateStateId}`;
         addEntity(key, {
-          entityId: `${candidate.candidateStateId}:${name.toLowerCase().replace(/\W+/g, '_')}`,
-          name,
-          class: inferEntityClassFromName(name),
+          entityId: `${candidate.candidateStateId}:${safeName.toLowerCase().replace(/\W+/g, '_')}`,
+          name: safeName,
+          class: inferEntityClassFromName(safeName),
           region: candidate.dominantRegion || '',
           stance: 'active',
           objectives: [],
@@ -12042,31 +12047,34 @@ function buildSimulationPackageEntities(selectedTheaters, candidates, actorRegis
 
   if (seen.size === 0) {
     for (const theater of selectedTheaters) {
+      const safeRegion = sanitizeForPrompt(theater.dominantRegion) || 'unknown region';
+      const safeRoute = sanitizeForPrompt(theater.routeFacilityKey || theater.dominantRegion) || safeRegion;
+      const safeBucket = sanitizeForPrompt(theater.topBucketId || 'commodity') || 'commodity';
       addEntity(`fallback:state:${theater.theaterId}`, {
-        entityId: `state:${theater.dominantRegion.toLowerCase().replace(/\W+/g, '_')}`,
-        name: `${theater.dominantRegion} state authority`,
+        entityId: `state:${safeRegion.toLowerCase().replace(/\W+/g, '_')}`,
+        name: `${safeRegion} state authority`,
         class: 'state_actor',
-        region: theater.dominantRegion,
+        region: safeRegion,
         stance: 'unknown',
         objectives: [],
         constraints: [],
         relevanceToTheater: theater.theaterId,
       });
       addEntity(`fallback:logistics:${theater.theaterId}`, {
-        entityId: `logistics:${(theater.routeFacilityKey || theater.dominantRegion).toLowerCase().replace(/\W+/g, '_')}`,
-        name: `${theater.routeFacilityKey || theater.dominantRegion} logistics operators`,
+        entityId: `logistics:${safeRoute.toLowerCase().replace(/\W+/g, '_')}`,
+        name: `${safeRoute} logistics operators`,
         class: 'logistics_operator',
-        region: theater.dominantRegion,
+        region: safeRegion,
         stance: 'stressed',
         objectives: [],
         constraints: [],
         relevanceToTheater: theater.theaterId,
       });
       addEntity(`fallback:market:${theater.theaterId}`, {
-        entityId: `market:${theater.topBucketId || 'commodity'}`,
-        name: `${theater.topBucketId || 'commodity'} market participants`,
+        entityId: `market:${safeBucket.toLowerCase().replace(/\W+/g, '_')}`,
+        name: `${safeBucket} market participants`,
         class: 'market_participant',
-        region: theater.macroRegions?.[0] || theater.dominantRegion,
+        region: theater.macroRegions?.[0] || safeRegion,
         stance: 'watching',
         objectives: [],
         constraints: [],
@@ -12234,7 +12242,13 @@ function buildSimulationStructuralWorld(selectedTheaters, { stateUnits, worldSig
 
   const selectedStateUnits = (stateUnits || []).filter((u) => theaterStateIds.has(u.id));
   const touchingSignals = (worldSignals?.signals || [])
-    .filter((s) => theaterRegions.has(s.region) || theaterRegions.has(s.macroRegion) || theaterStateIds.has(s.situationId))
+    .filter((s) => {
+      const mr = s.macroRegion;
+      const macroHit = Array.isArray(mr)
+        ? mr.some((r) => theaterRegions.has(r))
+        : theaterRegions.has(mr);
+      return theaterRegions.has(s.region) || macroHit || theaterStateIds.has(s.situationId);
+    })
     .slice(0, 20);
   const touchingTransmissionEdges = (marketTransmission?.edges || [])
     .filter((e) => theaterStateIds.has(e.sourceSituationId) || theaterStateIds.has(e.targetSituationId))
@@ -13563,6 +13577,14 @@ function validateCaseNarratives(items, predictions) {
 
 function sanitizeForPrompt(text) {
   return (text || '').replace(/[\n\r]/g, ' ').replace(/[<>{}\x00-\x1f]/g, '').slice(0, 200).trim();
+}
+
+function sanitizeEntityLabel(text) {
+  return sanitizeForPrompt(text)
+    .replace(/\b(ignore|override|disregard|forget)\b.{0,60}\b(previous|above|prior|earlier|instructions?)\b/gi, '')
+    .replace(/\b(system prompt|developer message|hidden instructions|tool output)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 // Sanitizes LLM-returned text before writing to Redis as a prompt section.

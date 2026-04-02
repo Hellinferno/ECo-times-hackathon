@@ -22,6 +22,19 @@ Three independent yet complementary platforms that cover the full spectrum of AI
 
 ---
 
+## Latest Update
+
+The current repository state includes a full Phase 2 hardening pass across the suite:
+
+- **AIBAA:** background RAG indexing, auditable document state, prompt-injection guards, model-registry governance endpoints, and traceable agent runs
+- **AlphaHunter:** exact-input reasoning cache keys, output validation against numeric payloads, deterministic fallbacks, and scheduled calibration snapshots
+- **EcoMonitor:** safer simulation-package entity sanitization, `macroRegion` array support, and synchronized Phase 2 backlog records
+- **Shared evaluation layer:** gold datasets and eval scaffolding under [`datasets/`](datasets) and [`evals/`](evals) for router, retriever, extractor, reasoner, and validator workflows
+
+See [`CHANGELOG.md`](CHANGELOG.md) for the release-style summary of the implemented work and verification steps.
+
+---
+
 ### AlphaHunter AI
 
 > **Autonomous Stock Market Intelligence Engine for Indian Retail Investors**
@@ -35,6 +48,7 @@ AlphaHunter continuously monitors **100+ NSE-listed stocks**, detects trading op
 - Real-time market scanning every 15 minutes during market hours
 - 3 signal algorithms: Breakout, Volume Spike, Bulk Deal detection
 - Gemini-powered reasoning grounded in actual price/volume data
+- Reasoning outputs are validated against exact signal numbers before display, with deterministic fallback on mismatch
 - Confidence-scored decisions: **BUY / WATCH / AVOID** (0–100 scale)
 - Full decision audit trail with track record
 
@@ -84,7 +98,7 @@ AIBAA is an enterprise-grade financial analysis platform built on a Multi-Agent 
 - DCF modeling: multi-scenario (Base/Bear/Bull), WACC calculator, implied share price ranges
 - LBO modeling: Sources & Uses mechanics, IRR targets, MOIC, debt scheduling
 - Professional-grade Excel generation (`.xlsx` IB models)
-- RAG pipeline with ChromaDB for document-grounded analysis (WIP)
+- Auditable RAG pipeline with background indexing, prompt guards, and traceable chunk usage
 
 **Tech:** Python 3.11 · FastAPI · PostgreSQL · Redis · ChromaDB · React · Vite · Gemini API · NVIDIA NIM · Docker
 
@@ -162,10 +176,12 @@ ECo-times-hackathon/
 
 ## Quick Start
 
+For a complete local checkout including the standalone AIBAA repository, clone the suite with `--recurse-submodules`.
+
 ### AlphaHunter
 
 ```bash
-git clone https://github.com/Hellinferno/ECo-times-hackathon.git
+git clone --recurse-submodules https://github.com/Hellinferno/ECo-times-hackathon.git
 cd ECo-times-hackathon/alphahunter
 
 # Start PostgreSQL + Redis

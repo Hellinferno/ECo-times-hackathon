@@ -1,0 +1,1 @@
+{"id":"aibaa-validator-001","task":"validator","input":{"claim":"Net debt is zero"},"context":{"cash_and_equivalents":150000000,"total_borrowings":0},"expected_output":{"status":"passed","blocking_issues":[]},"allowed_evidence":["cash_and_equivalents","total_borrowings"],"reviewer_verdict":"approved","failure_tags":[]}

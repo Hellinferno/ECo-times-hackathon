@@ -1,0 +1,1 @@
+{"id":"aibaa-router-001","task":"router","input":{"agent_type":"modeling","task_name":"valuation"},"context":{"deal_type":"ma","industry":"software"},"expected_output":{"target_agent":"modeling","target_task":"dcf_model"},"allowed_evidence":["task_name","agent_type"],"reviewer_verdict":"approved","failure_tags":[]}

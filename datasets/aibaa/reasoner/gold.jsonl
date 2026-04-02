@@ -1,0 +1,1 @@
+{"id":"aibaa-reasoner-001","task":"reasoner","input":{"valuation_basis":"dcf"},"context":{"enterprise_value":5400000000,"equity_value":4900000000},"expected_output":{"must_reference":["enterprise_value","equity_value"],"must_not_do":["invent_missing_inputs"]},"allowed_evidence":["valuation engine output"],"reviewer_verdict":"approved","failure_tags":[]}
