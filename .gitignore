@@ -1,5 +1,6 @@
 # Python
 __pycache__/
+.pytest_cache/
 *.py[cod]
 *.egg-info/
 dist/
@@ -37,3 +38,10 @@ docker-compose.override.yml
 
 # Build artifacts
 alphahunter/apps/frontend/dist/
+
+# Claude / Codex local workspace
+/CLAUDE.local.md
+/.claude/settings.local.json
+/.codex-archive/
+/.codex-cleanup/
+/.codex-feature/

@@ -33,6 +33,8 @@ The current repository state includes a full Phase 2 hardening pass across the s
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the release-style summary of the implemented work and verification steps.
 
+- **Monorepo developer workflow:** canonical project routing and contributor guardrails are now documented in [`CLAUDE.md`](CLAUDE.md), with shared commands, rules, and skills under [`.claude/`](.claude)
+
 ---
 
 ### AlphaHunter AI
@@ -169,8 +171,20 @@ ECo-times-hackathon/
 │   ├── 08-computation-engine.md
 │   └── ...
 │
+├── .claude/                              # Shared monorepo agent rules, commands, and skills
+│   ├── rules/                            # API, code-style, and testing guardrails
+│   ├── commands/                         # Reusable fix/review/deploy playbooks
+│   ├── skills/                           # Domain workflows (deploy, security-review)
+│   └── agents/                           # Reviewer personas (code-reviewer, security-auditor)
+│
 └── README.md                             ← You are here
 ```
+
+### Contributor workflow notes
+
+- Use `ecomonitor/` as the canonical WorldMonitor/EcoMonitor tree.
+- Treat `worldmonitor/` as a duplicate-candidate path unless explicitly requested.
+- Keep machine-local overrides in gitignored files such as `CLAUDE.local.md`.
 
 ---
 
