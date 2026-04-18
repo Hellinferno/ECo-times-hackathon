@@ -1,0 +1,112 @@
+version: "3.9"
+
+services:
+  # ---- PostgreSQL Database ----
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: aibaa
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: aibaa
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aibaa -d aibaa"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---- Redis (cache + ARQ queue + rate limiting) ----
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---- ChromaDB (vector store for RAG pipeline) ----
+  chroma:
+    image: ghcr.io/chroma-core/chroma:0.5.3
+    restart: unless-stopped
+    environment:
+      IS_PERSISTENT: "TRUE"
+      DATA_PATH: /data
+    volumes:
+      - chromadata:/data
+    ports:
+      - "8001:8000"
+
+  # ---- ARQ Worker (background task queue) ----
+  worker:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    command: python -m src.worker
+    environment:
+      DATABASE_URL: postgresql://aibaa:secret@db:5432/aibaa
+      AIBAA_ENV: production
+      REDIS_URL: redis://redis:6379/0
+      AIBAA_CHROMA_DIR: /chroma_data
+    env_file:
+      - .env
+    volumes:
+      - chromadata:/chroma_data
+      - ./apps/data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ---- FastAPI Backend ----
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://aibaa:secret@db:5432/aibaa
+      AIBAA_ENV: production
+      AIBAA_DEV_AUTH_ENABLED: "false"
+      AIBAA_ALLOWED_ORIGINS: "http://localhost:3000,http://localhost:80"
+      REDIS_URL: redis://redis:6379/0
+      AIBAA_CHROMA_DIR: /chroma_data
+    env_file:
+      - .env
+    volumes:
+      - chromadata:/chroma_data
+      - ./apps/data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ---- React Frontend ----
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  redisdata:
+  chromadata:

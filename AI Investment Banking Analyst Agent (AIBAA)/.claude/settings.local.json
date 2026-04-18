@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find \"d:/AI Investment Banking Analyst Agent \\(AIBAA\\)\" -type f -name \"*.py\")",
+      "Bash(python -c \":*)",
+      "Bash(gh pr:*)",
+      "Read(//c/Program Files/**)",
+      "Read(//c/Program Files \\(x86\\)/**)",
+      "Read(//d/AI Investment Banking Analyst Agent \\(AIBAA\\)/$LOCALAPPDATA/Programs/**)",
+      "Bash(ls \"d:/AI Investment Banking Analyst Agent \\(AIBAA\\)/apps/web/src/components/\")",
+      "Bash(where gh:*)"
+    ]
+  }
+}
