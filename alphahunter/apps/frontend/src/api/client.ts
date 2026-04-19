@@ -24,10 +24,35 @@ function normalizeApiBase(url: string): string {
 
 const API_BASE = normalizeApiBase(import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE);
 
+const TOKEN_KEY = "alphahunter_token";
+
+export function getAuthToken(): string | null {
+  try {
+    return sessionStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setAuthToken(token: string | null): void {
+  try {
+    if (token) sessionStorage.setItem(TOKEN_KEY, token);
+    else sessionStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* ignore storage errors (private mode etc.) */
+  }
+}
+
+function authHeaders(): Record<string, string> {
+  const token = getAuthToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     headers: {
       "Content-Type": "application/json",
+      ...authHeaders(),
       ...options?.headers,
     },
     ...options,
@@ -42,7 +67,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 async function requestBlob(path: string): Promise<Blob> {
-  const response = await fetch(`${API_BASE}${path}`);
+  const response = await fetch(`${API_BASE}${path}`, { headers: { ...authHeaders() } });
   if (!response.ok) {
     const errorPayload = await response.json().catch(() => ({ detail: response.statusText }));
     throw new Error(errorPayload.detail || `Request failed: ${response.status}`);
@@ -426,6 +451,54 @@ export interface SettingsResponse {
   [key: string]: string;
 }
 
+export interface PlatformUser {
+  id: string;
+  org_id: string;
+  org_slug: string;
+  username: string;
+  email: string | null;
+  role: string;
+}
+
+export interface LoginResponse {
+  access_token: string;
+  expires_at: string;
+  user: PlatformUser;
+}
+
+export interface FeedbackThread {
+  thread_id: string;
+  subject: string;
+  status: "open" | "resolved";
+  created_by_user_id: string;
+  created_at: string | null;
+  last_activity_at: string | null;
+}
+
+export interface FeedbackMessage {
+  message_id: string;
+  thread_id: string;
+  author_user_id: string;
+  author_role: "user" | "admin";
+  body: string;
+  created_at: string | null;
+}
+
+export interface FeedbackThreadListResponse {
+  threads: FeedbackThread[];
+  total: number;
+}
+
+export interface FeedbackThreadDetailResponse {
+  thread: FeedbackThread;
+  messages: FeedbackMessage[];
+}
+
+export interface FeedbackThreadCreatedResponse {
+  thread: FeedbackThread;
+  message: FeedbackMessage;
+}
+
 export const api = {
   getLatestScan: () => request<ApiResponse<ScanSummary | null>>("/scan/latest"),
   getScanStatus: (scanRunId: string) =>
@@ -573,4 +646,43 @@ export const api = {
   // Macro Context
   getMacroContext: (params?: { workspace_id?: string; symbol?: string; sector?: string }) =>
     request<ApiResponse<MacroContext>>(`/macro/context${createSearchParams(params ?? {})}`),
+
+  // Auth
+  login: async (username: string, password: string) => {
+    const res = await request<ApiResponse<LoginResponse>>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+    });
+    if (res?.data?.access_token) setAuthToken(res.data.access_token);
+    return res;
+  },
+  logout: async () => {
+    try {
+      await request<ApiResponse<{ message: string }>>("/auth/logout", { method: "POST" });
+    } finally {
+      setAuthToken(null);
+    }
+  },
+  getCurrentUser: () => request<ApiResponse<PlatformUser>>("/auth/me"),
+
+  // Feedback
+  listFeedbackThreads: () =>
+    request<ApiResponse<FeedbackThreadListResponse>>("/feedback/threads"),
+  createFeedbackThread: (payload: { subject: string; body: string }) =>
+    request<ApiResponse<FeedbackThreadCreatedResponse>>("/feedback/threads", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  getFeedbackThread: (threadId: string) =>
+    request<ApiResponse<FeedbackThreadDetailResponse>>(`/feedback/threads/${threadId}/messages`),
+  postFeedbackMessage: (threadId: string, body: string) =>
+    request<ApiResponse<FeedbackMessage>>(`/feedback/threads/${threadId}/messages`, {
+      method: "POST",
+      body: JSON.stringify({ body }),
+    }),
+  setFeedbackThreadStatus: (threadId: string, status: "open" | "resolved") =>
+    request<ApiResponse<FeedbackThread>>(`/feedback/threads/${threadId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }),
 };

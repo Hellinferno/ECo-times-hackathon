@@ -22,13 +22,16 @@ import {
   BookOpen,
   CandlestickChart,
   Gauge,
+  LogOut,
   Radar,
   Settings,
+  Shield,
   Star,
   TrendingUp,
   FileText,
 } from "lucide-react";
 import { api } from "../api/client";
+import { useAuth } from "../auth/auth-context";
 import { useScanCenter } from "../hooks/useScanCenter";
 import { Button, StatusBadge } from "./ui";
 import { cx } from "../lib/utils";
@@ -55,6 +58,11 @@ function getScanTone(status: string | null | undefined) {
 export default function Layout() {
   const { latestScan, triggerScan } = useScanCenter();
   const [unreadAlerts, setUnreadAlerts] = useState(0);
+  const { user, logout } = useAuth();
+  const visibleNav =
+    user?.role?.toLowerCase() === "admin"
+      ? [...navigation, { to: "/admin", label: "Admin", icon: Shield }]
+      : navigation;
 
   useEffect(() => {
     let cancelled = false;
@@ -123,7 +131,7 @@ export default function Layout() {
             </div>
 
             <nav className="mt-6 flex-1 space-y-2">
-              {navigation.map(({ to, label, icon: Icon }) => (
+              {visibleNav.map(({ to, label, icon: Icon }) => (
                 <NavLink
                   key={to}
                   to={to}
@@ -151,13 +159,28 @@ export default function Layout() {
             </nav>
 
             <div className="rounded-[28px] border border-white/8 bg-slate-900/70 p-4">
-              <div className="flex items-center gap-2 text-slate-300">
-                <Activity className="size-4 text-emerald-300" />
-                <span className="text-sm font-medium">Investor-first expansion</span>
+              <div className="flex items-center justify-between gap-2 text-slate-300">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Activity className="size-4 text-emerald-300" />
+                    <span className="text-sm font-medium">
+                      {user?.username ?? "Signed in"}
+                    </span>
+                  </div>
+                  <p className="mt-1 truncate text-[11px] text-slate-400">
+                    {user?.email ?? user?.org_slug}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void logout()}
+                  className="rounded-md border border-white/10 p-2 text-slate-300 hover:border-white/30 hover:text-white"
+                  aria-label="Sign out"
+                  title="Sign out"
+                >
+                  <LogOut className="size-4" />
+                </button>
               </div>
-              <p className="mt-2 text-xs leading-relaxed text-slate-400">
-                Dashboard, scanner, replay history, and charting now share one cohesive terminal shell.
-              </p>
             </div>
           </div>
         </aside>

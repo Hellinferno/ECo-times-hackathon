@@ -34,20 +34,38 @@ class DemoUser(TypedDict):
 
 class AuthSettings(BaseSettings):
     reviewer_roles: str = "reviewer,admin"
-    jwt_secret: str = "aibaa-demo-jwt-secret-change-me"
+    jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
     jwt_issuer: str = "aibaa.local"
     jwt_audience: str = "aibaa-api"
     jwt_expire_minutes: int = 480
     jwt_jwks_url: str | None = None
     session_cookie_name: str = "aibaa_session"
-    session_cookie_secure: bool = False
+    session_cookie_secure: bool = True
     session_cookie_samesite: str = "lax"
-    demo_password: str = "AIBAA-demo-2026!"
+    demo_password: str = ""
     demo_tenant_id: str = "org_demo"
-    demo_password_hint: str = "AIBAA-demo-2026!"
+    # Set AIBAA_DEMO_PASSWORD env var to configure the demo login password
+    demo_password_hint: str = "Set via AIBAA_DEMO_PASSWORD env var"
+    environment: str = "production"
 
     model_config = {"env_prefix": "AIBAA_"}
+
+    def __init__(self, **data):  # type: ignore[override]
+        super().__init__(**data)
+        # Allow non-HTTPS cookies in development only
+        if self.environment.lower() in ("development", "dev", "local"):
+            object.__setattr__(self, "session_cookie_secure", False)
+        # Enforce required secrets at startup
+        if not self.jwt_secret or self.jwt_secret == "aibaa-demo-jwt-secret-change-me":
+            raise ValueError(
+                "AIBAA_JWT_SECRET env var must be set to a strong secret before starting the server. "
+                "Do not use the placeholder value."
+            )
+        if not self.demo_password:
+            raise ValueError(
+                "AIBAA_DEMO_PASSWORD env var must be set before starting the server."
+            )
 
 
 @lru_cache

@@ -250,6 +250,23 @@ select.input-field {
 }
 
 /* ─── Badges ─── */
+/* ─── WorldMonitor refresh button ─── */
+.wm-refresh-btn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+}
+
+.wm-refresh-btn:hover {
+  color: var(--text-secondary);
+}
+
 .badge {
   display: inline-flex;
   align-items: center;

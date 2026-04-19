@@ -6,6 +6,8 @@ import DocumentsTab from '../components/workspace/DocumentsTab'
 import AgentsTab from '../components/workspace/AgentsTab'
 import OutputsTab from '../components/workspace/OutputsTab'
 import TasksTab from '../components/workspace/TasksTab'
+import MacroContextPanel from '../components/workspace/MacroContextPanel'
+import RiskHeatmapPanel from '../components/workspace/RiskHeatmapPanel'
 import LoadingScreen from '../components/ui/LoadingScreen'
 import StatusBadge from '../components/ui/StatusBadge'
 
@@ -165,6 +167,12 @@ export default function DealWorkspace() {
                                 </p>
                             </div>
                         )}
+
+                        {/* WorldMonitor Intelligence Panels */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+                            <MacroContextPanel />
+                            <RiskHeatmapPanel />
+                        </div>
                     </div>
                 )}
 

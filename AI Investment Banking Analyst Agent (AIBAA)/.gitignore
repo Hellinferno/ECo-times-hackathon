@@ -36,6 +36,10 @@ build/
 
 # Windows artifacts
 nul
+$null
+
+# Legacy duplicate codebase (Codex artifact)
+aibaa/
 
 # Claude local settings
 .claude/settings.local.json

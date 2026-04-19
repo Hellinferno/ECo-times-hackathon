@@ -37,5 +37,5 @@ def get_limiter():
         default_limit = os.environ.get("AIBAA_RATE_LIMIT", "60/minute")
         return Limiter(key_func=get_remote_address, default_limits=[default_limit])
     except ImportError:
-        logger.info("slowapi not installed — rate limiting disabled")
+        logger.warning("slowapi not installed — rate limiting is disabled. Install slowapi to enable.")
         return None

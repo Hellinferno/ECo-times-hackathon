@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>World Monitor Admin</title>
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('worldmonitor-theme');
+          if (t === 'light') document.documentElement.dataset.theme = 'light';
+        } catch (e) {}
+        document.documentElement.classList.add('no-transition');
+      })();
+    </script>
+    <style>
+      body { margin: 0; background: #0f0f0f; color: #e8e8e8; font-family: -apple-system, sans-serif; }
+      .admin-shell { max-width: 1200px; margin: 0 auto; padding: 24px; }
+      .admin-shell h1 { margin: 0 0 16px; font-size: 20px; }
+      .admin-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+      .admin-filter { display: inline-flex; gap: 4px; border: 1px solid #2a2a2a; border-radius: 6px; padding: 2px; }
+      .admin-chip { background: transparent; color: #aaa; border: 0; padding: 4px 10px; font: inherit; cursor: pointer; text-transform: capitalize; border-radius: 4px; }
+      .admin-chip.active { background: #44ff8820; color: #44ff88; }
+      .admin-grid { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 16px; }
+      .admin-inbox, .admin-detail { border: 1px solid #2a2a2a; border-radius: 8px; padding: 12px; background: #141414; }
+      .admin-inbox h3, .admin-detail-header h3 { margin: 0; font-size: 14px; }
+      .admin-list { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-direction: column; gap: 6px; }
+      .admin-thread { display: flex; flex-direction: column; gap: 4px; width: 100%; text-align: left; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 6px; padding: 8px 10px; color: inherit; cursor: pointer; font: inherit; }
+      .admin-thread.active { border-color: #44ff88; background: #44ff8810; }
+      .admin-thread-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+      .admin-thread-subject { font-size: 13px; }
+      .admin-thread-status { font-size: 10px; text-transform: uppercase; padding: 2px 6px; border-radius: 999px; background: #2a2a2a; color: #aaa; }
+      .admin-status-open { background: #44ff8820; color: #44ff88; }
+      .admin-thread-meta { font-size: 11px; color: #777; }
+      .admin-detail-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+      .admin-stream { max-height: 420px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 6px 2px; }
+      .admin-msg { max-width: 80%; padding: 8px 10px; border-radius: 8px; background: #1a1a1a; }
+      .admin-msg-user { align-self: flex-start; }
+      .admin-msg-admin { align-self: flex-end; background: #44ff8820; color: #e8fff0; }
+      .admin-msg-body { white-space: pre-wrap; font-size: 13px; }
+      .admin-msg-meta { margin-top: 4px; font-size: 10px; color: #888; text-transform: uppercase; }
+      .admin-composer { margin-top: 10px; display: flex; gap: 8px; align-items: flex-end; }
+      .admin-textarea { flex: 1; min-height: 64px; resize: vertical; background: #0f0f0f; border: 1px solid #2a2a2a; color: inherit; padding: 8px; border-radius: 6px; font: inherit; }
+      .admin-cta { background: #44ff88; color: #000; border: 0; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+      .admin-cta:disabled { opacity: 0.4; cursor: not-allowed; }
+      .admin-empty { color: #888; padding: 16px; text-align: center; }
+      .admin-error { border: 1px solid #ff444440; background: #ff444410; color: #ff8080; padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; }
+    </style>
+  </head>
+  <body>
+    <div class="admin-shell">
+      <h1>Admin — Feedback inbox</h1>
+      <div id="admin-root"></div>
+    </div>
+    <script type="module" src="/src/admin-main.ts"></script>
+  </body>
+</html>

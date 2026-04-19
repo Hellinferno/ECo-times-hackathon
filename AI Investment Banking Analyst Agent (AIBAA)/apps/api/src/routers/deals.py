@@ -1,10 +1,11 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from db_models import DealModel, DocumentModel, OutputModel
-from dependencies import get_current_user, get_db
+from dependencies import UserContext, get_current_user, get_db
 from models import APIResponse, APIResponseList, DealCreate, DealUpdate, Meta
 from persistence import get_deal_for_user, sync_deal_to_store
 from store import store
@@ -16,7 +17,7 @@ router = APIRouter(prefix="/deals", tags=["Deals"])
 async def create_deal(
     deal_data: DealCreate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: UserContext = Depends(get_current_user),
 ):
     new_deal = DealModel(
         id=str(uuid.uuid4()),
@@ -61,7 +62,7 @@ async def list_deals(
     limit: int = 20,
     offset: int = 0,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: UserContext = Depends(get_current_user),
 ):
     limit = max(1, min(limit, 100))
     offset = max(0, offset)
@@ -81,11 +82,27 @@ async def list_deals(
 
     deals = query.offset(offset).limit(limit).all()
 
+    # Batch-count documents and outputs in 2 queries instead of 2*N queries
+    deal_ids = [d.id for d in deals]
+    doc_counts: dict[str, int] = {}
+    output_counts: dict[str, int] = {}
+    if deal_ids:
+        doc_counts = dict(
+            db.query(DocumentModel.deal_id, func.count(DocumentModel.id))
+            .filter(DocumentModel.deal_id.in_(deal_ids))
+            .group_by(DocumentModel.deal_id)
+            .all()
+        )
+        output_counts = dict(
+            db.query(OutputModel.deal_id, func.count(OutputModel.id))
+            .filter(OutputModel.deal_id.in_(deal_ids))
+            .group_by(OutputModel.deal_id)
+            .all()
+        )
+
     response_list = []
     for deal in deals:
         sync_deal_to_store(deal)
-        doc_count = db.query(DocumentModel).filter(DocumentModel.deal_id == deal.id).count()
-        output_count = db.query(OutputModel).filter(OutputModel.deal_id == deal.id).count()
         response_list.append({
             "id": deal.id,
             "name": deal.name,
@@ -94,8 +111,8 @@ async def list_deals(
             "industry": deal.industry,
             "deal_stage": deal.deal_stage,
             "created_at": deal.created_at.isoformat(),
-            "document_count": doc_count,
-            "output_count": output_count,
+            "document_count": doc_counts.get(deal.id, 0),
+            "output_count": output_counts.get(deal.id, 0),
         })
 
     return APIResponseList(
@@ -114,7 +131,7 @@ async def list_deals(
 async def get_deal(
     deal_id: str,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: UserContext = Depends(get_current_user),
 ):
     deal = get_deal_for_user(db, deal_id, current_user["tenant_id"])
     if not deal:
@@ -144,7 +161,7 @@ async def update_deal(
     deal_id: str,
     update_data: DealUpdate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: UserContext = Depends(get_current_user),
 ):
     deal = get_deal_for_user(db, deal_id, current_user["tenant_id"])
     if not deal:
@@ -169,7 +186,7 @@ async def update_deal(
 async def delete_deal(
     deal_id: str,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: UserContext = Depends(get_current_user),
 ):
     deal = get_deal_for_user(db, deal_id, current_user["tenant_id"])
     if not deal:

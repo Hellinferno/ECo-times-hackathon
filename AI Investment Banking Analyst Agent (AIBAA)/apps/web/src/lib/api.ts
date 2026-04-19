@@ -38,10 +38,12 @@ async function bootstrapDevToken(): Promise<string | null> {
         return accessToken;
     }
 
-    // Use the backend's /auth/login endpoint with demo credentials
+    // Use the backend's /auth/login endpoint with demo credentials.
+    // Password is read from VITE_DEMO_PASSWORD env var — never hardcoded.
+    const demoPassword = (import.meta.env.VITE_DEMO_PASSWORD as string | undefined)?.trim() || '';
     const res = await authApi.post<APIResponse<LoginResponse>>(
         '/auth/login',
-        { username: DEV_AUTH_ROLE, password: 'AIBAA-demo-2026!' },
+        { username: DEV_AUTH_ROLE, password: demoPassword },
     );
     // The backend sets a session cookie; also extract user for cache
     currentUserCache = res.data.data.user;
@@ -421,6 +423,185 @@ export async function updateTask(dealId: string, taskId: string, update: TaskUpd
 export async function deleteTask(dealId: string, taskId: string): Promise<void> {
     await ensureAuthToken();
     await api.delete(`/deals/${dealId}/tasks/${taskId}`);
+}
+
+// ── WorldMonitor (macro/market/risk data) ──
+
+export interface WMHealthResponse {
+    connected: boolean;
+    enabled: boolean;
+}
+
+export interface WMMacroSignals {
+    available: boolean;
+    signals: {
+        timestamp: string;
+        verdict: string;
+        bullishCount: number;
+        totalCount: number;
+        unavailable: boolean;
+    } | null;
+}
+
+export interface WMFredSeries {
+    available: boolean;
+    series: {
+        seriesId: string;
+        title: string;
+        observations: Array<{ date: string; value: number }>;
+    } | null;
+}
+
+export interface WMRiskScore {
+    region: string;
+    staticBaseline: number;
+    dynamicScore: number;
+    combinedScore: number;
+    trend: string;
+    components: {
+        newsActivity: number;
+        ciiContribution: number;
+        geoConvergence: number;
+        militaryActivity: number;
+    };
+}
+
+export interface WMRiskScoresResponse {
+    available: boolean;
+    ciiScores: WMRiskScore[];
+    strategicRisks: Array<{
+        region: string;
+        level: string;
+        score: number;
+        factors: string[];
+    }>;
+}
+
+export interface WMChokepoint {
+    id: string;
+    name: string;
+    lat: number;
+    lon: number;
+    disruptionScore: number;
+    status: string;
+    activeWarnings: number;
+    congestionLevel: string;
+    affectedRoutes: string[];
+    description: string;
+}
+
+export interface WMChokepointsResponse {
+    available: boolean;
+    chokepoints: WMChokepoint[];
+}
+
+export interface WMFearGreedResponse {
+    available: boolean;
+    data: {
+        value: number;
+        classification: string;
+        previous_close: number;
+        one_week_ago: number;
+        one_month_ago: number;
+    } | null;
+}
+
+export interface WMMarketQuote {
+    symbol: string;
+    name: string;
+    price: number;
+    change: number;
+    changePercent: number;
+    marketCap: number | null;
+}
+
+export async function fetchWMHealth(): Promise<WMHealthResponse> {
+    const res = await api.get<WMHealthResponse>('/world-monitor/health');
+    return res.data;
+}
+
+export async function fetchWMMacroSignals(): Promise<WMMacroSignals> {
+    const res = await api.get<WMMacroSignals>('/world-monitor/macro-signals');
+    return res.data;
+}
+
+export async function fetchWMFredSeries(seriesId: string, limit = 120): Promise<WMFredSeries> {
+    const res = await api.get<WMFredSeries>(`/world-monitor/fred/${seriesId}`, { params: { limit } });
+    return res.data;
+}
+
+export async function fetchWMRiskScores(): Promise<WMRiskScoresResponse> {
+    const res = await api.get<WMRiskScoresResponse>('/world-monitor/risk-scores');
+    return res.data;
+}
+
+export async function fetchWMChokepoints(): Promise<WMChokepointsResponse> {
+    const res = await api.get<WMChokepointsResponse>('/world-monitor/chokepoints');
+    return res.data;
+}
+
+export async function fetchWMFearGreed(): Promise<WMFearGreedResponse> {
+    const res = await api.get<WMFearGreedResponse>('/world-monitor/fear-greed');
+    return res.data;
+}
+
+export async function fetchWMMarketQuotes(symbols?: string): Promise<{ available: boolean; quotes: WMMarketQuote[] }> {
+    const params = symbols ? { symbols } : {};
+    const res = await api.get<{ available: boolean; quotes: WMMarketQuote[] }>('/world-monitor/market-quotes', { params });
+    return res.data;
+}
+
+// ── Feedback / Support Chat ──
+
+export interface FeedbackThread {
+    thread_id: string;
+    subject: string;
+    status: 'open' | 'resolved';
+    created_by_user_id: string;
+    created_at: string | null;
+    last_activity_at: string | null;
+}
+
+export interface FeedbackMessage {
+    message_id: string;
+    thread_id: string;
+    author_user_id: string;
+    author_role: 'user' | 'admin';
+    body: string;
+    created_at: string | null;
+}
+
+export async function fetchFeedbackThreads(): Promise<FeedbackThread[]> {
+    const res = await api.get<APIResponse<{ threads: FeedbackThread[]; total: number }>>('/feedback/threads');
+    return res.data.data.threads;
+}
+
+export async function createFeedbackThread(subject: string, body: string): Promise<{ thread: FeedbackThread; message: FeedbackMessage }> {
+    const res = await api.post<APIResponse<{ thread: FeedbackThread; message: FeedbackMessage }>>(
+        '/feedback/threads',
+        { subject, body },
+    );
+    return res.data.data;
+}
+
+export async function fetchFeedbackMessages(threadId: string): Promise<{ thread: FeedbackThread; messages: FeedbackMessage[] }> {
+    const res = await api.get<APIResponse<{ thread: FeedbackThread; messages: FeedbackMessage[] }>>(
+        `/feedback/threads/${threadId}/messages`,
+    );
+    return res.data.data;
+}
+
+export async function postFeedbackMessage(threadId: string, body: string): Promise<FeedbackMessage> {
+    const res = await api.post<APIResponse<FeedbackMessage>>(
+        `/feedback/threads/${threadId}/messages`,
+        { body },
+    );
+    return res.data.data;
+}
+
+export async function setFeedbackThreadStatus(threadId: string, status: 'open' | 'resolved'): Promise<FeedbackThread> {
+    const res = await api.patch<APIResponse<FeedbackThread>>(`/feedback/threads/${threadId}`, { status });
+    return res.data.data;
 }
 
 export { api, authApi }

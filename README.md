@@ -184,19 +184,44 @@ ECo-times-hackathon/
 
 - Use `ecomonitor/` as the canonical WorldMonitor/EcoMonitor tree.
 - Treat `worldmonitor/` as a duplicate-candidate path unless explicitly requested.
+- Plain `git clone` is now the default checkout flow for the full suite; AIBAA is tracked directly in this monorepo.
 - Keep machine-local overrides in gitignored files such as `CLAUDE.local.md`.
+- Phase 1 keeps the three products modular at runtime while unifying repo management; the future shared product shell is planned to be AIBAA-first.
 
 ---
 
 ## Quick Start
 
-For a complete local checkout including the standalone AIBAA repository, clone the suite with `--recurse-submodules`.
+Clone the suite once, then choose the product-local or root wrapper workflow that fits the task.
+
+```bash
+git clone https://github.com/Hellinferno/ECo-times-hackathon.git
+cd ECo-times-hackathon
+```
+
+### Root Developer Commands
+
+The root [`Makefile`](Makefile) provides thin wrappers around each product's existing command surface:
+
+```bash
+make help
+make dev-aibaa
+make dev-alphahunter
+make dev-ecomonitor
+make test-aibaa
+make test-alphahunter
+make test-ecomonitor
+make lint-aibaa
+make lint-alphahunter
+make lint-ecomonitor
+```
+
+These commands preserve modular deployments and simply delegate to the canonical project-local workflows.
 
 ### AlphaHunter
 
 ```bash
-git clone --recurse-submodules https://github.com/Hellinferno/ECo-times-hackathon.git
-cd ECo-times-hackathon/alphahunter
+cd alphahunter
 
 # Start PostgreSQL + Redis
 docker compose up -d postgres redis
@@ -214,7 +239,7 @@ Open <http://localhost:5173> → click **Trigger Market Scan**.
 ### EcoMonitor
 
 ```bash
-cd ECo-times-hackathon/ecomonitor
+cd ecomonitor
 npm install
 npm run dev        # http://localhost:5173
 ```
@@ -223,7 +248,7 @@ No environment variables required for basic operation.
 ### AIBAA
 
 ```bash
-cd "ECo-times-hackathon/AI Investment Banking Analyst Agent (AIBAA)"
+cd "AI Investment Banking Analyst Agent (AIBAA)"
 cp .env.example .env   # add GEMINI_API_KEY + AIBAA_JWT_SECRET
 make up                # boots api, web, db, redis, chroma via Docker
 ```
@@ -255,7 +280,7 @@ All three projects support split frontend/backend deployment:
 |---------|----------|---------|----------|
 | AlphaHunter | Vercel (`alphahunter/apps/frontend`) | Railway (single replica) | Railway PostgreSQL |
 | WorldMonitor | Vercel Edge (60+ functions) | Railway relay | Upstash Redis |
-| AIBAA | Vercel (`AIBAA/apps/web`) | Railway | Railway PostgreSQL |
+| AIBAA | Vercel (`AI Investment Banking Analyst Agent (AIBAA)/apps/web`) | Railway | Railway PostgreSQL |
 
 **Required environment variables per project:**
 

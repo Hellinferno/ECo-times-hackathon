@@ -32,29 +32,41 @@ export interface SessionResult {
   valid: boolean;
   userId?: string;
   role?: 'free' | 'pro';
+  isAdmin?: boolean;
 }
 
-// Short-lived in-memory cache for plan lookups (userId → { role, expiresAt }).
+// Short-lived in-memory cache for plan+admin lookups.
 // Avoids hammering the Clerk API on every premium request. TTL = 5 min.
-const _planCache = new Map<string, { role: 'free' | 'pro'; expiresAt: number }>();
+interface PlanCacheEntry {
+  role: 'free' | 'pro';
+  isAdmin: boolean;
+  expiresAt: number;
+}
+const _planCache = new Map<string, PlanCacheEntry>();
 const PLAN_CACHE_TTL_MS = 5 * 60 * 1_000;
 
-async function lookupPlanFromClerk(userId: string): Promise<'free' | 'pro'> {
+async function lookupPlanFromClerk(
+  userId: string,
+): Promise<{ role: 'free' | 'pro'; isAdmin: boolean }> {
   const cached = _planCache.get(userId);
-  if (cached && Date.now() < cached.expiresAt) return cached.role;
+  if (cached && Date.now() < cached.expiresAt) {
+    return { role: cached.role, isAdmin: cached.isAdmin };
+  }
 
-  if (!CLERK_SECRET_KEY) return 'free';
+  if (!CLERK_SECRET_KEY) return { role: 'free', isAdmin: false };
   try {
     const resp = await fetch(`https://api.clerk.com/v1/users/${userId}`, {
       headers: { Authorization: `Bearer ${CLERK_SECRET_KEY}` },
     });
-    if (!resp.ok) return 'free';
+    if (!resp.ok) return { role: 'free', isAdmin: false };
     const user = (await resp.json()) as { public_metadata?: Record<string, unknown> };
-    const role: 'free' | 'pro' = user.public_metadata?.plan === 'pro' ? 'pro' : 'free';
-    _planCache.set(userId, { role, expiresAt: Date.now() + PLAN_CACHE_TTL_MS });
-    return role;
+    const meta = user.public_metadata ?? {};
+    const role: 'free' | 'pro' = meta.plan === 'pro' ? 'pro' : 'free';
+    const isAdmin = meta.role === 'admin';
+    _planCache.set(userId, { role, isAdmin, expiresAt: Date.now() + PLAN_CACHE_TTL_MS });
+    return { role, isAdmin };
   } catch {
-    return 'free';
+    return { role: 'free', isAdmin: false };
   }
 }
 
@@ -85,14 +97,20 @@ export async function validateBearerToken(token: string): Promise<SessionResult>
     // `plan` claim is present only in 'convex' template tokens. For standard
     // session tokens we fall back to a cached Clerk API lookup.
     const rawPlan = (payload as Record<string, unknown>).plan;
-    const role: 'free' | 'pro' =
-      rawPlan !== undefined
-        ? rawPlan === 'pro'
-          ? 'pro'
-          : 'free'
-        : await lookupPlanFromClerk(userId);
+    const rawRole = (payload as Record<string, unknown>).role;
 
-    return { valid: true, userId, role };
+    let role: 'free' | 'pro';
+    let isAdmin: boolean;
+    if (rawPlan !== undefined) {
+      role = rawPlan === 'pro' ? 'pro' : 'free';
+      isAdmin = rawRole === 'admin';
+    } else {
+      const looked = await lookupPlanFromClerk(userId);
+      role = looked.role;
+      isAdmin = looked.isAdmin;
+    }
+
+    return { valid: true, userId, role, isAdmin };
   } catch {
     // Signature verification failed, expired, wrong issuer, etc.
     return { valid: false };

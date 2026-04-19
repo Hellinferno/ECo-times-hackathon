@@ -1,0 +1,196 @@
+/* Feedback widget — floating button + drawer */
+
+#feedback-widget-root .fw-button {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #44ff88;
+  color: #000;
+  border: 0;
+  font-size: 20px;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(68, 255, 136, 0.3);
+  z-index: 1000;
+}
+
+#feedback-widget-root .fw-drawer {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  width: 340px;
+  max-height: 520px;
+  display: flex;
+  flex-direction: column;
+  background: #141414;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  z-index: 1001;
+  color: #e8e8e8;
+  font-family: -apple-system, sans-serif;
+  overflow: hidden;
+}
+
+#feedback-widget-root .fw-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid #2a2a2a;
+}
+#feedback-widget-root .fw-header > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#feedback-widget-root .fw-title { font-weight: 600; }
+#feedback-widget-root .fw-icon {
+  background: transparent;
+  border: 0;
+  color: #aaa;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+#feedback-widget-root .fw-icon:hover { color: #e8e8e8; }
+
+#feedback-widget-root .fw-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+#feedback-widget-root .fw-thread-scroll { padding: 12px; gap: 8px; }
+
+#feedback-widget-root .fw-thread {
+  width: 100%;
+  text-align: left;
+  background: #1a1a1a;
+  color: inherit;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+#feedback-widget-root .fw-thread:hover { border-color: #44ff88; }
+#feedback-widget-root .fw-thread-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+#feedback-widget-root .fw-thread-subject {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#feedback-widget-root .fw-thread-status {
+  font-size: 10px;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #2a2a2a;
+  color: #aaa;
+}
+#feedback-widget-root .fw-status-open {
+  background: rgba(68, 255, 136, 0.18);
+  color: #44ff88;
+}
+#feedback-widget-root .fw-thread-meta { font-size: 11px; color: #777; }
+
+#feedback-widget-root .fw-footer {
+  padding: 10px;
+  border-top: 1px solid #2a2a2a;
+}
+#feedback-widget-root .fw-cta {
+  width: 100%;
+  background: #44ff88;
+  color: #000;
+  border: 0;
+  padding: 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+#feedback-widget-root .fw-cta:disabled { opacity: 0.4; cursor: not-allowed; }
+
+#feedback-widget-root .fw-form {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+#feedback-widget-root .fw-input,
+#feedback-widget-root .fw-textarea {
+  background: #0f0f0f;
+  color: inherit;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  padding: 8px;
+  font: inherit;
+}
+#feedback-widget-root .fw-textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+#feedback-widget-root .fw-msg {
+  max-width: 85%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #1a1a1a;
+}
+#feedback-widget-root .fw-msg-user {
+  align-self: flex-end;
+  background: rgba(68, 255, 136, 0.18);
+  color: #e8fff0;
+}
+#feedback-widget-root .fw-msg-admin {
+  align-self: flex-start;
+}
+#feedback-widget-root .fw-msg-body { white-space: pre-wrap; font-size: 13px; }
+#feedback-widget-root .fw-msg-meta {
+  margin-top: 4px;
+  font-size: 10px;
+  text-transform: uppercase;
+  color: #888;
+}
+
+#feedback-widget-root .fw-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+#feedback-widget-root .fw-composer .fw-textarea { min-height: 60px; }
+
+#feedback-widget-root .fw-empty {
+  color: #888;
+  text-align: center;
+  padding: 12px;
+  font-size: 13px;
+}
+#feedback-widget-root .fw-muted {
+  color: #888;
+  padding: 8px 12px;
+  text-align: center;
+  font-size: 12px;
+}
+#feedback-widget-root .fw-error {
+  margin: 0 10px 6px;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 68, 68, 0.3);
+  background: rgba(255, 68, 68, 0.1);
+  color: #ff8080;
+  border-radius: 6px;
+  font-size: 12px;
+}

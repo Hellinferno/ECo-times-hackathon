@@ -44,8 +44,31 @@ class DueDiligenceAgent(BaseAgent):
             if not doc_context.strip():
                 self.think("No parsed documents found — generating risk assessment from deal metadata only.")
 
+            # Enrich with WorldMonitor geopolitical risk data
+            geo_risk_context = self._fetch_geo_risk_context(deal_info)
+            if geo_risk_context:
+                self.observe(f"WorldMonitor geo-risk overlay appended ({len(geo_risk_context)} chars).")
+
+            # Enrich with TinyFish web due diligence (opt-in)
+            web_dd_context = ""
+            if self.input_payload.get("parameters", {}).get("web_enrichment"):
+                web_dd_context = self._fetch_web_dd_context(deal_info)
+                if web_dd_context:
+                    self.observe(f"TinyFish DD web context appended ({len(web_dd_context)} chars).")
+
             self.act("ask_llm", "performing due diligence risk analysis via LLM")
-            prompt = PromptBuilder.build_dd_prompt(doc_context)
+            enriched_context = doc_context
+            if geo_risk_context:
+                enriched_context += (
+                    "\n\n--- External Risk Intelligence (WorldMonitor) ---\n"
+                    + geo_risk_context
+                )
+            if web_dd_context:
+                enriched_context += (
+                    "\n\n--- Live Web Due Diligence (TinyFish) ---\n"
+                    + web_dd_context
+                )
+            prompt = PromptBuilder.build_dd_prompt(enriched_context)
             raw = ask_llm(self.system_prompt, prompt)
 
             self.observe(f"LLM response received ({len(raw)} chars). Parsing risk data.")
@@ -87,6 +110,118 @@ class DueDiligenceAgent(BaseAgent):
             self.fail(str(exc))
 
         return self.run_id
+
+    def _fetch_geo_risk_context(self, deal_info: dict) -> str:
+        """Fetch WorldMonitor geopolitical risk data for DD enrichment.
+
+        Returns a text block summarizing country risk, supply-chain chokepoint
+        status, and recent conflict events.  Returns ``""`` on any failure so
+        the DD proceeds with document-only analysis.
+        """
+        try:
+            from tools.world_monitor import wm_client
+            if not wm_client.enabled:
+                return ""
+
+            country = deal_info.get("country", "")
+            industry = deal_info.get("industry", "")
+            sections: list[str] = []
+
+            # Fetch all geo-risk data in parallel
+            risk_score, chokepoints, events, signals = wm_client.run_parallel_sync(
+                wm_client.get_country_risk(country) if country else wm_client.get_risk_scores(),
+                wm_client.get_chokepoint_status(),
+                wm_client.get_conflict_events(country) if country else wm_client.get_conflict_events(),
+                wm_client.get_macro_signals(),
+            )
+
+            # 1. Country risk score (CII)
+            if country and risk_score and hasattr(risk_score, "region"):
+                risk = risk_score
+                trend = risk.trend.replace("TREND_DIRECTION_", "").title()
+                sections.append(
+                    f"Country Risk Index ({risk.region}): "
+                    f"{risk.combined_score:.0f}/100 "
+                    f"(baseline {risk.static_baseline:.0f}, "
+                    f"dynamic +{risk.dynamic_score:.0f}, trend: {trend})"
+                )
+
+            # 2. Supply chain chokepoint disruptions
+            if chokepoints:
+                disrupted = [c for c in chokepoints if c.disruption_score > 50]
+                if disrupted:
+                    cp_lines = []
+                    for c in sorted(disrupted, key=lambda x: -x.disruption_score)[:5]:
+                        routes = ", ".join(c.affected_routes[:3]) if c.affected_routes else "N/A"
+                        cp_lines.append(
+                            f"  - {c.name}: {c.status} "
+                            f"(disruption={c.disruption_score:.0f}/100, "
+                            f"warnings={c.active_warnings}, "
+                            f"routes: {routes})"
+                        )
+                    sections.append(
+                        "Disrupted Global Trade Chokepoints:\n" + "\n".join(cp_lines)
+                    )
+
+            # 3. Regional conflict events (last 30 days)
+            if events:
+                total_fatalities = sum(e.fatalities for e in events)
+                type_counts: dict[str, int] = {}
+                for e in events:
+                    t = e.event_type or "Unknown"
+                    type_counts[t] = type_counts.get(t, 0) + 1
+                breakdown = ", ".join(f"{v} {k}" for k, v in type_counts.items())
+                sections.append(
+                    f"ACLED Conflict Events ({country or 'Global'}, 30d): "
+                    f"{len(events)} events, "
+                    f"{total_fatalities} fatalities "
+                    f"({breakdown})"
+                )
+
+            # 4. Macro regime context
+            if signals and not signals.unavailable:
+                sections.append(
+                    f"Macro Market Regime: {signals.verdict} "
+                    f"({signals.bullish_count}/{signals.total_count} signals bullish)"
+                )
+
+            return "\n".join(sections)
+        except Exception as exc:
+            logger.debug("WorldMonitor geo-risk fetch failed: %s", exc)
+            return ""
+
+    def _fetch_web_dd_context(self, deal_info: dict) -> str:
+        """Fetch live regulatory filings via TinyFish for DD enrichment."""
+        try:
+            from tools.web_agent import web_agent
+            if not web_agent.enabled:
+                return ""
+
+            company = deal_info.get("company_name", "")
+            if not company:
+                return ""
+
+            sections: list[str] = []
+
+            result = web_agent.fetch_regulatory_filings_sync(company)
+            if result.success and result.data:
+                filings = result.data if isinstance(result.data, list) else [result.data]
+                lines = []
+                for f in filings[:5]:
+                    if isinstance(f, dict):
+                        ftype = f.get("filing_type", "Filing")
+                        date = f.get("date", "")
+                        summary = f.get("summary", f.get("title", ""))
+                        lines.append(f"  - [{ftype}] {date}: {summary}")
+                if lines:
+                    sections.append(
+                        f"Recent Regulatory Filings ({company}):\n" + "\n".join(lines)
+                    )
+
+            return "\n".join(sections)
+        except Exception as exc:
+            logger.debug("TinyFish DD web context fetch failed: %s", exc)
+            return ""
 
     def _parse_risk_data(self, raw: str) -> dict:
         """Extract JSON from LLM response with fallback."""

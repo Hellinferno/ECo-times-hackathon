@@ -198,3 +198,35 @@ class ModelRegistryModel(Base):
     promoted_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+
+class FeedbackThreadModel(Base):
+    __tablename__ = "feedback_threads"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id = Column(String, index=True, nullable=False)
+    created_by_user_id = Column(String, index=True, nullable=False)
+    subject = Column(String, nullable=False)
+    status = Column(String, default="open", index=True)  # open | resolved
+    created_at = Column(DateTime, default=_utcnow)
+    last_activity_at = Column(DateTime, default=_utcnow, index=True)
+
+    messages = relationship(
+        "FeedbackMessageModel",
+        back_populates="thread",
+        cascade="all, delete-orphan",
+        order_by="FeedbackMessageModel.created_at",
+    )
+
+
+class FeedbackMessageModel(Base):
+    __tablename__ = "feedback_messages"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    thread_id = Column(String, ForeignKey("feedback_threads.id", ondelete="CASCADE"), index=True, nullable=False)
+    author_user_id = Column(String, index=True, nullable=False)
+    author_role = Column(String, nullable=False)  # user | admin
+    body = Column(String, nullable=False)
+    created_at = Column(DateTime, default=_utcnow, index=True)
+
+    thread = relationship("FeedbackThreadModel", back_populates="messages")

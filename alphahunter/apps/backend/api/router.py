@@ -7,6 +7,7 @@ from fastapi import APIRouter
 
 from api.endpoints import (
     alerts,
+    feedback,
     health,
     history,
     opportunities,
@@ -28,6 +29,7 @@ api_router.include_router(stock.router, prefix="/stock", tags=["stock"])
 api_router.include_router(watchlist.router, prefix="/watchlist", tags=["watchlist"])
 api_router.include_router(alerts.router, prefix="/alerts", tags=["alerts"])
 api_router.include_router(settings.router, prefix="/settings", tags=["settings"])
+api_router.include_router(feedback.router)
 
 # ── Platform (auth / companies / workspaces / valuations / macro) ──────────────
 api_router.include_router(unified_platform.auth_router)

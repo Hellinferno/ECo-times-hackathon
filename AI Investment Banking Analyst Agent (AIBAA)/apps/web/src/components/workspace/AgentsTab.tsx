@@ -48,6 +48,7 @@ const AGENT_CONFIGS: AgentConfig[] = [
             { key: 'wacc_override', label: 'WACC OVERRIDE', type: 'text', placeholder: '—', defaultValue: '' },
             { key: 'current_market_cap', label: 'CURRENT MARKET CAP', type: 'text', placeholder: 'Optional', defaultValue: '' },
             { key: 'current_share_price', label: 'CURRENT SHARE PRICE', type: 'text', placeholder: 'Optional', defaultValue: '' },
+            { key: 'web_enrichment', label: 'WEB ENRICHMENT', type: 'text', placeholder: 'true / false', defaultValue: '' },
         ],
     },
     {
@@ -81,7 +82,9 @@ const AGENT_CONFIGS: AgentConfig[] = [
         taskName: 'dd_report',
         badge: 'DD',
         description: 'Risk assessment report · Financial → Operational → Legal → Market risks + Red Flags',
-        params: [],
+        params: [
+            { key: 'web_enrichment', label: 'WEB ENRICHMENT', type: 'text', placeholder: 'true / false', defaultValue: '' },
+        ],
     },
     {
         id: 'research',
@@ -90,7 +93,9 @@ const AGENT_CONFIGS: AgentConfig[] = [
         taskName: 'industry_brief',
         badge: 'Research',
         description: 'Industry brief PDF + Buyer universe JSON · Market sizing → Competitive landscape → Buyers',
-        params: [],
+        params: [
+            { key: 'web_enrichment', label: 'WEB ENRICHMENT', type: 'text', placeholder: 'true / false', defaultValue: '' },
+        ],
     },
     {
         id: 'cim',

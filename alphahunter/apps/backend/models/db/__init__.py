@@ -35,6 +35,7 @@ from .workspace_agent_run import WorkspaceAgentRun
 from .workspace_task import WorkspaceTask
 from .workspace_output import WorkspaceOutput
 from .valuation_run import ValuationRun
+from .feedback import FeedbackThread, FeedbackMessage
 
 __all__ = [
     # Base
@@ -63,4 +64,6 @@ __all__ = [
     "WorkspaceTask",
     "WorkspaceOutput",
     "ValuationRun",
+    "FeedbackThread",
+    "FeedbackMessage",
 ]

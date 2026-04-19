@@ -26,6 +26,7 @@ from persistence import hydrate_store_from_db, sync_deal_to_store, sync_document
 from rag.indexing import schedule_rag_indexing, update_document_rag_state
 from routers import agents, auth, deals, documents, outputs, tasks
 from routers.admin import router as admin_router
+from routers.feedback import router as feedback_router
 from routers.webhooks import router as webhooks_router
 from routers.world_monitor import router as world_monitor_router
 
@@ -111,6 +112,7 @@ app.include_router(outputs.output_router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(tasks.router, prefix="/api/v1")
 app.include_router(admin_router, prefix="/api/v1")
+app.include_router(feedback_router, prefix="/api/v1")
 app.include_router(webhooks_router, prefix="/api/v1")
 app.include_router(world_monitor_router, prefix="/api/v1")
 

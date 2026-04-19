@@ -7,6 +7,7 @@ export interface AuthUser {
   email: string;
   image?: string | null;
   role: 'free' | 'pro';
+  isAdmin: boolean;
 }
 
 /** Simplified auth session state for UI consumption. */
@@ -27,6 +28,7 @@ function snapshotSession(): AuthSession {
       email: cu.email,
       image: cu.image,
       role: cu.plan,
+      isAdmin: cu.isAdmin,
     },
     isPending: false,
   };

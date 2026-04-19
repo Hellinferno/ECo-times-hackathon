@@ -27,4 +27,21 @@ export default defineSchema({
     name: v.string(),
     value: v.number(),
   }).index("by_name", ["name"]),
+  feedbackThreads: defineTable({
+    createdByUserId: v.string(),
+    subject: v.string(),
+    status: v.union(v.literal("open"), v.literal("resolved")),
+    createdAt: v.number(),
+    lastActivityAt: v.number(),
+  })
+    .index("by_user_activity", ["createdByUserId", "lastActivityAt"])
+    .index("by_status_activity", ["status", "lastActivityAt"])
+    .index("by_activity", ["lastActivityAt"]),
+  feedbackMessages: defineTable({
+    threadId: v.id("feedbackThreads"),
+    authorUserId: v.string(),
+    authorRole: v.union(v.literal("user"), v.literal("admin")),
+    body: v.string(),
+    createdAt: v.number(),
+  }).index("by_thread", ["threadId", "createdAt"]),
 });

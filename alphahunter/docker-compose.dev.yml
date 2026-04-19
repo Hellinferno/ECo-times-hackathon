@@ -10,7 +10,7 @@ version: '3.8'
 services:
   worldmonitor:
     build:
-      context: ../worldmonitor
+      context: ../ecomonitor
       dockerfile: Dockerfile
     image: worldmonitor:latest
     container_name: alphahunter_worldmonitor
@@ -39,7 +39,7 @@ services:
 
   ais-relay:
     build:
-      context: ../worldmonitor
+      context: ../ecomonitor
       dockerfile: Dockerfile.relay
     image: worldmonitor-ais-relay:latest
     container_name: alphahunter_ais_relay
@@ -58,7 +58,7 @@ services:
 
   worldmonitor-redis-rest:
     build:
-      context: ../worldmonitor
+      context: ../ecomonitor
       dockerfile: docker/Dockerfile.redis-rest
     image: worldmonitor-redis-rest:latest
     container_name: alphahunter_worldmonitor_redis_rest

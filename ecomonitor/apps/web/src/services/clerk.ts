@@ -157,16 +157,24 @@ export async function getClerkToken(): Promise<string | null> {
 }
 
 /** Get current Clerk user metadata. Returns null if signed out. */
-export function getCurrentClerkUser(): { id: string; name: string; email: string; image: string | null; plan: 'free' | 'pro' } | null {
+export function getCurrentClerkUser(): {
+  id: string;
+  name: string;
+  email: string;
+  image: string | null;
+  plan: 'free' | 'pro';
+  isAdmin: boolean;
+} | null {
   const user = clerkInstance?.user;
   if (!user) return null;
-  const plan = (user.publicMetadata as Record<string, unknown>)?.plan;
+  const meta = (user.publicMetadata as Record<string, unknown>) ?? {};
   return {
     id: user.id,
     name: user.fullName ?? user.firstName ?? 'User',
     email: user.primaryEmailAddress?.emailAddress ?? '',
     image: user.imageUrl ?? null,
-    plan: plan === 'pro' ? 'pro' : 'free',
+    plan: meta.plan === 'pro' ? 'pro' : 'free',
+    isAdmin: meta.role === 'admin',
   };
 }
 

@@ -1,9 +1,12 @@
+import hashlib
 import json
 import logging
 import os
 import re
 from pathlib import Path
+from typing import Optional
 
+import redis as redis_lib
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
@@ -32,6 +35,42 @@ _load_env_files()
 # Check if API keys are available
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 _gemini_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
+
+# ── Deterministic prompt cache (Redis) ────────────────────────────────────────
+# temperature=0.0 means identical prompts always produce identical responses.
+# Caching avoids redundant API calls when multiple agents process the same
+# document (QJL-inspired: zero-bit re-computation via cache lookup).
+_PROMPT_CACHE_TTL = 3600  # 1 hour — documents don't change mid-pipeline
+
+_prompt_redis_client: Optional[redis_lib.Redis] = None
+
+
+def _get_prompt_redis() -> Optional[redis_lib.Redis]:
+    """Return shared Redis client for prompt cache, or None if unavailable."""
+    global _prompt_redis_client
+    if _prompt_redis_client is not None:
+        return _prompt_redis_client
+    try:
+        redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+        client = redis_lib.from_url(redis_url, decode_responses=True, socket_timeout=2)
+        client.ping()
+        _prompt_redis_client = client
+        return _prompt_redis_client
+    except Exception as exc:
+        logger.debug("Redis unavailable for prompt cache: %s", exc)
+        return None
+
+
+def _prompt_cache_key(system_prompt: str, user_prompt: str) -> str:
+    """SHA-256 key (16 hex chars) for a (system, user) prompt pair.
+
+    PolarQuant insight: normalise inputs before keying — strip leading/trailing
+    whitespace so minor formatting differences don't create false cache misses.
+    """
+    digest = hashlib.sha256(
+        f"{system_prompt.strip()}|{user_prompt.strip()}".encode()
+    ).hexdigest()
+    return f"llm:prompt:{digest[:16]}"
 
 
 def _sanitize_error(err: Exception) -> str:
@@ -138,6 +177,9 @@ def ask_llm(
     Submit prompt to Gemini using the active runtime configuration.
     Transient errors are retried up to 3x with exponential backoff via tenacity.
     No secondary LLM fallback is allowed in the Phase 0/1 extraction pipeline.
+
+    Audit calls (purpose="audit") bypass the cache — audit results must always
+    be freshly computed to avoid serving stale verification judgements.
     """
     runtime_config = resolve_llm_runtime_config(purpose=purpose, tenant_id=tenant_id)
 
@@ -145,8 +187,20 @@ def ask_llm(
         logger.error("[LLM Engine] No API keys configured")
         raise RuntimeError("No API keys found. Please configure GEMINI_API_KEY.")
 
+    # Cache lookup (skip for audit purposes — stale audit results are dangerous)
+    cache_key = _prompt_cache_key(system_prompt, user_prompt)
+    redis = _get_prompt_redis()
+    if redis and purpose != "audit":
+        try:
+            cached = redis.get(cache_key)
+            if cached:
+                logger.debug("[LLM Engine] Prompt cache hit (purpose=%s)", purpose)
+                return cached
+        except Exception:
+            pass
+
     try:
-        return _call_gemini_with_config(system_prompt, user_prompt, runtime_config)
+        result = _call_gemini_with_config(system_prompt, user_prompt, runtime_config)
     except Exception as e_gemini:
         if _is_quota_or_rate_limit_error(e_gemini):
             logger.error("[LLM Engine] Primary LLM quota/rate limit: %s", _sanitize_error(e_gemini))
@@ -154,6 +208,15 @@ def ask_llm(
 
         logger.error("[LLM Engine] Gemini call failed: %s", _sanitize_error(e_gemini))
         raise RuntimeError(f"Primary LLM failed: {_sanitize_error(e_gemini)}")
+
+    # Store in cache
+    if redis and purpose != "audit":
+        try:
+            redis.setex(cache_key, _PROMPT_CACHE_TTL, result)
+        except Exception:
+            pass
+
+    return result
 
 
 def _build_generic_fallback_profile() -> dict:

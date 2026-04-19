@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 
 from db_models import TaskModel
-from dependencies import get_current_user, get_db
+from dependencies import UserContext, get_current_user, get_db
 from models import APIResponse, Meta, PriorityStr
 from persistence import get_deal_for_user
 
@@ -46,7 +46,7 @@ def _serialize_task(t: TaskModel) -> dict:
 async def list_tasks(
     deal_id: str,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: UserContext = Depends(get_current_user),
 ):
     deal = get_deal_for_user(db, deal_id, current_user["tenant_id"])
     if not deal:
@@ -70,7 +70,7 @@ async def create_task(
     deal_id: str,
     payload: TaskCreate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: UserContext = Depends(get_current_user),
 ):
     deal = get_deal_for_user(db, deal_id, current_user["tenant_id"])
     if not deal:
@@ -102,7 +102,7 @@ async def update_task(
     task_id: str,
     payload: TaskUpdate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: UserContext = Depends(get_current_user),
 ):
     deal = get_deal_for_user(db, deal_id, current_user["tenant_id"])
     if not deal:
@@ -139,7 +139,7 @@ async def delete_task(
     deal_id: str,
     task_id: str,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: UserContext = Depends(get_current_user),
 ):
     deal = get_deal_for_user(db, deal_id, current_user["tenant_id"])
     if not deal:
